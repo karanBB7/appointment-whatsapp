@@ -213,7 +213,25 @@ function sendslots($phone, $slots, $url, $headers) {
 
 function confirmation($phone, $message, $headers) {
     $url = "https://whatsappapi-79t7.onrender.com/send-text-message";
-    // echo $phone . " " . $message;exit;
+    $data = array(
+        "messaging_product" => "whatsapp",
+        "to" => $phone,
+        "text" => array(
+            "body" => $message
+        )
+    );
+    $data_json = json_encode($data);
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_exec($ch);
+    curl_close($ch);
+}
+
+function name($phone, $message, $headers) {
+    $url = "https://whatsappapi-79t7.onrender.com/send-text-message";
     $data = array(
         "messaging_product" => "whatsapp",
         "to" => $phone,

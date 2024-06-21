@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once("./listfunctions.php");
+require_once("./booking.php");
 require_once("./middleware.php");
 
 $url = 'https://whatsappapi-79t7.onrender.com/interact-messages';
@@ -11,9 +11,11 @@ $headers = array(
     'Content-Type: application/json',
 );
 
+
+
 $conn = mysqli_connect("localhost", "root", "", "appointment");
 
-$query = "SELECT id, messages, fromNumber, buttonText, description, status, listid FROM received_whatsapp_messagebot WHERE status = 0";
+$query = "SELECT id, messages, fromNumber, buttonText, description, status, listid FROM received_whatsapp_messagebot WHERE status = 0 OR status = 2";
 $result = mysqli_query($conn, $query);
 
 if (!$result) {
@@ -22,7 +24,7 @@ if (!$result) {
 
 $messagesToProcess = [];
 while ($row = mysqli_fetch_assoc($result)) {
-    if ($row['status'] == 0) {
+    if ($row['status'] == 0 | $row['status'] == "2") {
         $messagesToProcess[] = $row;
     }
 }
@@ -35,18 +37,26 @@ foreach ($messagesToProcess as $row) {
     $status = $row['status'];
     $type = $row['listid'];
 
+
     $name = $_SESSION['name'] ?? '';
     $_SESSION['phone'] = $phone;
 
     if (strpos($content, "Hello!") !== false) {
         $name = trim(substr($content, strpos($content, "Hello!") + strlen("Hello!")));
+        $updateQuery = "UPDATE received_whatsapp_messagebot SET status = 2, sectionname = 'cliniclist' WHERE id = $messageId";
+        mysqli_query($conn, $updateQuery);
         $_SESSION['name'] = $name;
         $_SESSION['clinic_status'] = "0";
     }
 
-    if (!empty($name)) {
-        $response = listMesasage($name, $phone);
-        if ($content !== null) {
+    $initial = "SELECT status,messages FROM received_whatsapp_messagebot WHERE id = $messageId";
+    $result = mysqli_query($conn, $initial);
+    $doctorname = mysqli_fetch_assoc($result);
+    $doctorstatus = $doctorname['status'];
+
+       
+        if ($content !== null && $status ==="2") {
+            $response = listMesasage($name, $phone);
             Listappointment($phone, $response, $url, $headers);
             $updateQuery = "UPDATE received_whatsapp_messagebot SET status = 1, sectionname = 'cliniclist' WHERE id = $messageId";
             mysqli_query($conn, $updateQuery);
@@ -55,10 +65,9 @@ foreach ($messagesToProcess as $row) {
             $query2 = "SELECT sectionname FROM received_whatsapp_messagebot WHERE id = $prevMessageId";
             $result2 = mysqli_query($conn, $query2);
             $prevRow = mysqli_fetch_assoc($result2);
-            $prevSectionname = $prevRow['sectionname'];
-    
+            $prevSectionname = $prevRow['sectionname'];    
+
             if ($prevSectionname === "cliniclist" & $type === "1") {
-                echo $type;exit;
                 $getclinic = book($name, $phone);
                 clincList($phone, $getclinic, $url, $headers);
                 $updateQuery = "UPDATE received_whatsapp_messagebot SET status = 1, sectionname = 'datelist' WHERE id = $messageId";
@@ -69,28 +78,47 @@ foreach ($messagesToProcess as $row) {
                 $_SESSION['clinicid'] = $type; 
                 $getdate = getday($name, $phone, $type);
                 sendDate($phone, $getdate, $url, $headers);
-                $updateQuery = "UPDATE received_whatsapp_messagebot SET status = 1, sectionname = 'slotlist' WHERE id = $messageId";
+                $updateQuery = "UPDATE received_whatsapp_messagebot SET status = 1, sectionname = 'name' WHERE id = $messageId";
                 mysqli_query($conn, $updateQuery);
             }
     
-            elseif ($prevSectionname === "slotlist" && $status == "0") {
-                $clinicid = $_SESSION['clinicid'] ?? 'undefined';
+            elseif ($prevSectionname === "name" && $status == "0") {
+                $message = "Please enter your name";
+                name($phone, $message, $headers);
+                $updateQuery = "UPDATE received_whatsapp_messagebot SET status = 1, sectionname = 'slotslist' WHERE id = $messageId";
+                mysqli_query($conn, $updateQuery);
                 $_SESSION['dateid'] = $type; 
-                $slots = getslots($name, $phone,$clinicid,$type);
+            }
+            
+    
+             elseif($prevSectionname === "slotslist" && $status == "0") {
+                $_SESSION['content'] = $content;
+                $clinicid = $_SESSION['clinicid'] ?? 'undefined';
+                $dateid = $_SESSION['dateid'] ?? 'undefined';
+                $slots = getslots($name, $phone,$clinicid,$dateid);
                 sendslots($phone,$slots, $url, $headers);
                 $updateQuery = "UPDATE received_whatsapp_messagebot SET status = 1, sectionname = 'booking' WHERE id = $messageId";
                 mysqli_query($conn, $updateQuery);
             }
-            
-            elseif ($prevSectionname === "booking" && $status == "0") {
+        
+
+            elseif ($prevSectionname === "booking"  && $status == "0") {
+                $patientname = $_SESSION['content'];
                 $clinicid = $_SESSION['clinicid'] ?? 'undefined';
                 $dateid = $_SESSION['dateid'] ?? 'undefined';
                 $description;
                 $slotname = str_replace('_slot', '', $description);
                 $slottime = $type;
-                $res = dobooking($name, $phone,$clinicid,$dateid,$slotname,$slottime);
+                $res = dobooking($name,$phone,$clinicid,$dateid,$slotname,$slottime,$patientname);
+               
                 $response = json_decode($res, true);
-                $message = $response['message'];
+                
+                $spaces = str_repeat(" ", 10);
+                $message =  "\n" . $spaces . "*" . $response['message'] . "*" . "\n";
+                $message .= "\n";
+                $message .= "Name: " . $patientname . "\n";
+                $message .= "Slot: " . $slotname . "\n";
+                $message .= "Time: " . $slottime . "\n";
 
                 confirmation($phone, $message, $headers);
                 $updateQuery = "UPDATE received_whatsapp_messagebot SET status = 1, sectionname = 'done' WHERE id = $messageId";
@@ -98,7 +126,7 @@ foreach ($messagesToProcess as $row) {
             }
 
         }
-    }
+    
     
 }
 
