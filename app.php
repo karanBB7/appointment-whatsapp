@@ -63,9 +63,14 @@ function processMessage($conn, $row, $url, $headers) {
     if (strpos($content, "Hello!") !== false) {
         $name = trim(substr($content, strpos($content, "Hello!") + strlen("Hello!")));
         $sessionData['name'] = $name;
-        $currentStep = 'cliniclist';
+        $currentStep = 'initial';
         updateSession($conn, $phone, $currentStep, $sessionData);
         handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers);
+    } else if ($currentStep === 'initial') {
+        $sessionData['storedType'] = $type;
+        $currentStep = 'cliniclist';
+        updateSession($conn, $phone, $currentStep, $sessionData);
+        handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content);
     } else {
         handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content);
     }
@@ -112,50 +117,109 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
     $patientname = $sessionData['patientname'] ?? '';
     $clinicid = $sessionData['clinicid'] ?? null;
     $dateid = $sessionData['dateid'] ?? null;
-    
-    switch ($currentStep) {
-        case "cliniclist":
-            handleClinicList($conn, $messageId, $name, $phone, $url, $headers);
-            $nextStep = "datelist";
-            break;
-        case "datelist":
-            handleDateList($conn, $messageId, $name, $phone, $type, $url, $headers);
-            $clinicid = $type;
-            $sessionData['clinicid'] = $clinicid;
-            $nextStep = "name";
-            break;
-        case "name":
-            $dateid = $type;
-            $sessionData['dateid'] = $dateid;
-            if (empty($content)) {
-                handleNamePrompt($conn, $messageId, $phone, $headers);
-                $nextStep = "slotslist"; 
-            } 
-            else {
-                $sessionData['name'] = $name;
-                 handleNameInput($conn, $messageId, $phone, $content, $headers);
-                $nextStep = "slotslist";
-            }
-            break;
+    $storedType = $sessionData['storedType'] ?? null;
 
-        case "slotslist":
-            $sessionData['patientname']  = $content;
-            $clinicid = $sessionData['clinicid'] ?? null;
-            $dateid = $sessionData['dateid'] ?? null;
-            
-            handleSlotsList($conn, $messageId, $name, $phone, $url, $headers, $dateid, $clinicid);
-            $nextStep = "booking";
-            break;
-        case "booking":
-            $patientname =  $sessionData['patientname'];
-            handleBooking($conn, $messageId, $name, $phone, $description, $type, $url, $headers, $sessionData,$patientname);
-            $nextStep = "complete";
-            break;
-        default:
-            $nextStep = $currentStep;
-            break;
+    if ($storedType === "1") {
+        switch ($currentStep) {
+            case "cliniclist":
+                handleClinicList($conn, $messageId, $name, $phone, $url, $headers);
+                $nextStep = "datelist";
+                break;
+            case "datelist":
+                handleDateList($conn, $messageId, $name, $phone, $type, $url, $headers);
+                $clinicid = $type;
+                $sessionData['clinicid'] = $clinicid;
+                $nextStep = "name";
+                break;
+            case "name":
+                $dateid = $type;
+                $sessionData['dateid'] = $dateid;
+                if (empty($content)) {
+                    handleNamePrompt($conn, $messageId, $phone, $headers);
+                    $nextStep = "slotslist"; 
+                } else {
+                    $sessionData['name'] = $name;
+                    handleNameInput($conn, $messageId, $phone, $content, $headers);
+                    $nextStep = "slotslist";
+                }
+                break;
+            case "slotslist":
+                $sessionData['patientname'] = $content;
+                $clinicid = $sessionData['clinicid'] ?? null;
+                $dateid = $sessionData['dateid'] ?? null;
+                handleSlotsList($conn, $messageId, $name, $phone, $url, $headers, $dateid, $clinicid);
+                $nextStep = "booking";
+                break;
+            case "booking":
+                $patientname = $sessionData['patientname'];
+                handleBooking($conn, $messageId, $name, $phone, $description, $type, $url, $headers, $sessionData, $patientname);
+                $nextStep = "complete";
+                break;
+            default:
+                $nextStep = $currentStep;
+                break;
+        }
+    } else if ($storedType === "2") {
+
+        $bookingDateID = $sessionData['bookingDateID'] ?? null;
+        $rescheduleDate = $sessionData['rescheduleDate'] ?? null;
+        switch ($currentStep) {
+            case "cliniclist":
+                handleGetBookedDate($conn, $messageId, $name, $phone, $url, $headers);
+                $nextStep = "bookedDates";
+                break;
+            case "bookedDates":
+                $sessionData['bookingDateID'] =  $type;
+                handleGetDayReschedule($conn, $messageId, $name, $phone, $type, $url, $headers);
+                $nextStep = "dateReschedule";
+                break;
+
+            case "dateReschedule":
+                $sessionData['rescheduleDate'] =  $type;
+                handleRescheduleSlots($conn, $messageId, $name, $phone, $bookingDateID, $type, $url, $headers);
+                $nextStep = "slotReschedule";
+                break;
+
+            case "slotReschedule":
+                handleReschedule($conn, $messageId, $name, $phone, $bookingDateID, $description, $rescheduleDate, $type, $url, $headers);
+                $nextStep = "complete";
+                break;
+
+
+            default:
+                $nextStep = $currentStep;
+                break;
+        }
+    } else if ($storedType === "3") {
+        switch ($currentStep) {
+
+            case "cliniclist":
+                handleGetDatesToDrop($conn, $messageId, $name, $phone, $url, $headers);
+                $nextStep = "SelectDatesToCancel";
+                break;
+
+            case "SelectDatesToCancel":
+                handleGetDropStatus($conn, $messageId, $name, $phone, $type, $url, $headers);
+                $nextStep = "complete";
+                break;
+            default:
+                $nextStep = $currentStep;
+                break;
+        }
+    } else if ($storedType === "4") {
+        switch ($currentStep) {
+            case "cliniclist":
+                handleFetchAppointments($conn, $messageId, $name, $phone, $url, $headers);
+                $nextStep = "complete";
+                break;
+            default:
+                $nextStep = $currentStep;
+                break;
+        }
     }
-
+    
     updateSession($conn, $phone, $nextStep, $sessionData);
 }
+
+
 ?>

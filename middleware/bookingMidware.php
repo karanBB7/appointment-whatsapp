@@ -197,10 +197,6 @@ function name($phone, $message, $headers) {
 }
 
 function sendWhatsAppMessage($url, $data, $headers) {
-    // Ensure $headers is an array
-    if (!is_array($headers)) {
-        $headers = array($headers);
-    }
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, 1);
