@@ -62,6 +62,7 @@ function getday($username, $phonenumber, $clinicId) {
     return makeApiRequest($payload);
 }
 
+
 function getslots($username, $phonenumber, $clinicId, $date) {
     $payload = [
         "username" => $username,
@@ -73,13 +74,14 @@ function getslots($username, $phonenumber, $clinicId, $date) {
     return makeApiRequest($payload);
 }
 
-function dobooking($username, $phonenumber, $clinicId, $date, $slotname, $slottime, $patientname) {
+
+function dobooking($name, $phone, $clinicid, $dateid, $slotname, $slottime, $patientname) {
     $payload = [
-        "username" => $username,
-        "mobilenumber" => $phonenumber,
+        "username" => $name,
+        "mobilenumber" => $phone,
         "type" => "1",
-        "clinic" => $clinicId,
-        "date" => $date,
+        "clinic" => $clinicid,
+        "date" => $dateid,
         "slot_name" => $slotname,
         "slot_time" => $slottime,
         "name" => $patientname
