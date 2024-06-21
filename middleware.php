@@ -1,8 +1,6 @@
-
 <?php
 
-
-function Listappointment($phone, $response, $url, $headers){
+function Listappointment($phone, $response, $url, $headers) {
     $responseArray = json_decode($response, true);
     if (isset($responseArray['list_message'])) {
         $listMessage = $responseArray['list_message'];
@@ -43,20 +41,13 @@ function Listappointment($phone, $response, $url, $headers){
             ),
         );
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        $result = curl_exec($ch);     
-        curl_close($ch);
-        return $result;
+        return sendWhatsAppMessage($url, $data, $headers);
     } else {
         return "Invalid response format";
     }
 }
 
-function clincList($phone,$getclinic, $url, $headers){
+function clincList($phone, $getclinic, $url, $headers) {
     $responseArray = json_decode($getclinic, true);
     if (isset($responseArray['clinic'])) {
         $listMessage = $responseArray['clinic'];
@@ -94,22 +85,13 @@ function clincList($phone,$getclinic, $url, $headers){
             ),
         );
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        $result = curl_exec($ch);    
-        curl_close($ch);
-        return $result;
-
+        return sendWhatsAppMessage($url, $data, $headers);
     } else {
         return "Invalid response format";
     }
 }
 
-
-function sendDate($phone,$getdate, $url, $headers){
+function sendDate($phone, $getdate, $url, $headers) {
     $responseArray = json_decode($getdate, true);
     if (isset($responseArray['date'])) {
         $listMessage = $responseArray['date'];
@@ -127,7 +109,7 @@ function sendDate($phone,$getdate, $url, $headers){
                 'type' => 'list',
                 'header' => array(
                     'type' => 'text',
-                    'text' => 'When woulld you like to visit?',
+                    'text' => 'When would you like to visit?',
                 ),
                 'body' => array(
                     'text' => 'Please select the respective activity given:',
@@ -144,21 +126,11 @@ function sendDate($phone,$getdate, $url, $headers){
             ),
         );
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        $result = curl_exec($ch);   
-        // echo $result; 
-        curl_close($ch);
-        return $result;
-
+        return sendWhatsAppMessage($url, $data, $headers);
     } else {
         return "Invalid response format";
     }
 }
-
 
 function sendslots($phone, $slots, $url, $headers) {
     $response = json_decode($slots, true);
@@ -197,19 +169,8 @@ function sendslots($phone, $slots, $url, $headers) {
         ),
     );
 
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    $res = curl_exec($ch);
-    // echo $res;
-    if (curl_errno($ch)) {
-        echo 'Error: ' . curl_error($ch);
-    }
-    curl_close($ch);
+    return sendWhatsAppMessage($url, $data, $headers);
 }
-
 
 function confirmation($phone, $message, $headers) {
     $url = "https://whatsappapi-79t7.onrender.com/send-text-message";
@@ -220,14 +181,7 @@ function confirmation($phone, $message, $headers) {
             "body" => $message
         )
     );
-    $data_json = json_encode($data);
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_exec($ch);
-    curl_close($ch);
+    return sendWhatsAppMessage($url, $data, $headers);
 }
 
 function name($phone, $message, $headers) {
@@ -239,17 +193,21 @@ function name($phone, $message, $headers) {
             "body" => $message
         )
     );
-    $data_json = json_encode($data);
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_exec($ch);
-    curl_close($ch);
+    return sendWhatsAppMessage($url, $data, $headers);
 }
 
-
-
+function sendWhatsAppMessage($url, $data, $headers) {
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    $result = curl_exec($ch);
+    if (curl_errno($ch)) {
+        error_log('Curl error: ' . curl_error($ch));
+    }
+    curl_close($ch);
+    return $result;
+}
 
 ?>

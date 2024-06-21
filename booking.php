@@ -1,13 +1,9 @@
-<?php 
+<?php
 
-function listMesasage($username, $phonenumber) {
+function makeApiRequest($payload) {
     $curl = curl_init();
-    $payload = json_encode(array(
-        "username" => $username,
-        "mobilenumber" => $phonenumber
-    ));
-
-    curl_setopt_array($curl, array(
+    
+    $defaultOptions = [
         CURLOPT_URL => 'http://13.234.213.35/linqmd/webhook-appointment',
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_ENCODING => '',
@@ -16,111 +12,69 @@ function listMesasage($username, $phonenumber) {
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
         CURLOPT_CUSTOMREQUEST => 'POST',
-        CURLOPT_POSTFIELDS => $payload,
-        CURLOPT_HTTPHEADER => array(
+        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_HTTPHEADER => [
             'Content-Type: application/json',
             'Authorization: Basic bGlucW1kOlNAaVBrSG1GU2FpOXo='
-        ),
-    ));
+        ],
+    ];
 
-    $response = curl_exec($curl);
-    curl_close($curl);
-    return $response;
+    curl_setopt_array($curl, $defaultOptions);
+
+    try {
+        $response = curl_exec($curl);
+        if ($response === false) {
+            throw new Exception(curl_error($curl), curl_errno($curl));
+        }
+        return $response;
+    } catch (Exception $e) {
+        error_log("cURL Error: " . $e->getMessage());
+        return false;
+    } finally {
+        curl_close($curl);
+    }
 }
 
-
+function listMesasage($username, $phonenumber) {
+    $payload = [
+        "username" => $username,
+        "mobilenumber" => $phonenumber
+    ];
+    return makeApiRequest($payload);
+}
 
 function book($username, $phonenumber) {
-    $curl = curl_init();
-    $payload = json_encode(array(
+    $payload = [
         "username" => $username,
         "mobilenumber" => $phonenumber,
         "type" => "1"
-    ));
-
-    curl_setopt_array($curl, array(
-        CURLOPT_URL => 'http://13.234.213.35/linqmd/webhook-appointment',
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_ENCODING => '',
-        CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 0,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        CURLOPT_CUSTOMREQUEST => 'POST',
-        CURLOPT_POSTFIELDS => $payload,
-        CURLOPT_HTTPHEADER => array(
-            'Content-Type: application/json',
-            'Authorization: Basic bGlucW1kOlNAaVBrSG1GU2FpOXo='
-        ),
-    ));
-    $response = curl_exec($curl);
-    curl_close($curl);
-    return $response;
+    ];
+    return makeApiRequest($payload);
 }
 
-
-function getday($username, $phonenumber,$clinicId) {
-    $curl = curl_init();
-    $payload = json_encode(array(
+function getday($username, $phonenumber, $clinicId) {
+    $payload = [
         "username" => $username,
         "mobilenumber" => $phonenumber,
         "type" => "1",
         "clinic" => $clinicId
-    ));
-
-    curl_setopt_array($curl, array(
-        CURLOPT_URL => 'http://13.234.213.35/linqmd/webhook-appointment',
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_ENCODING => '',
-        CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 0,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        CURLOPT_CUSTOMREQUEST => 'POST',
-        CURLOPT_POSTFIELDS => $payload,
-        CURLOPT_HTTPHEADER => array(
-            'Content-Type: application/json',
-            'Authorization: Basic bGlucW1kOlNAaVBrSG1GU2FpOXo='
-        ),
-    ));
-    $response = curl_exec($curl);
-    curl_close($curl);
-    return $response;
+    ];
+    return makeApiRequest($payload);
 }
 
-function getslots($username, $phonenumber,$clinicId,$date) {
-    $curl = curl_init();
-    $payload = json_encode(array(
+function getslots($username, $phonenumber, $clinicId, $date) {
+    $payload = [
         "username" => $username,
         "mobilenumber" => $phonenumber,
         "type" => "1",
         "clinic" => $clinicId,
         "date" => $date,
-    ));
-
-    curl_setopt_array($curl, array(
-        CURLOPT_URL => 'http://13.234.213.35/linqmd/webhook-appointment',
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_ENCODING => '',
-        CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 0,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        CURLOPT_CUSTOMREQUEST => 'POST',
-        CURLOPT_POSTFIELDS => $payload,
-        CURLOPT_HTTPHEADER => array(
-            'Content-Type: application/json',
-            'Authorization: Basic bGlucW1kOlNAaVBrSG1GU2FpOXo='
-        ),
-    ));
-    $response = curl_exec($curl);
-    curl_close($curl);
-    return $response;
+    ];
+    return makeApiRequest($payload);
 }
 
-function dobooking($username, $phonenumber,$clinicId,$date,$slotname,$slottime,$patientname) {
-    $curl = curl_init();
-    $payload = json_encode(array(
+function dobooking($username, $phonenumber, $clinicId, $date, $slotname, $slottime, $patientname) {
+    $payload = [
         "username" => $username,
         "mobilenumber" => $phonenumber,
         "type" => "1",
@@ -129,29 +83,8 @@ function dobooking($username, $phonenumber,$clinicId,$date,$slotname,$slottime,$
         "slot_name" => $slotname,
         "slot_time" => $slottime,
         "name" => $patientname
-    ));
-
-    curl_setopt_array($curl, array(
-        CURLOPT_URL => 'http://13.234.213.35/linqmd/webhook-appointment',
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_ENCODING => '',
-        CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 0,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        CURLOPT_CUSTOMREQUEST => 'POST',
-        CURLOPT_POSTFIELDS => $payload,
-        CURLOPT_HTTPHEADER => array(
-            'Content-Type: application/json',
-            'Authorization: Basic bGlucW1kOlNAaVBrSG1GU2FpOXo='
-        ),
-    ));
-    $response = curl_exec($curl);
-    curl_close($curl);
-    return $response;
+    ];
+    return makeApiRequest($payload);
 }
-
-
-
 
 ?>
