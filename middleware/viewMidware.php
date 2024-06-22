@@ -12,4 +12,18 @@ function appointments($phone, $message, $headers) {
     return sendWhatsAppMessage($url, $data, $headers);
 }
 
+function sendErrorMessage($phone, $message, $headers) {
+    $url = "https://whatsappapi-79t7.onrender.com/send-text-message";
+    $data = array(
+        "messaging_product" => "whatsapp",
+        "to" => $phone,
+        "text" => array(
+            "body" => $message
+        )
+    );
+    return sendWhatsAppMessage($url, $data, $headers);
+}
+
+
+
 ?>

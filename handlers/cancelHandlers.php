@@ -5,7 +5,15 @@ require_once("middleware/cancelMidware.php");
 
 function handleGetDatesToDrop($conn, $messageId, $name, $phone, $url, $headers){
     $getDatesToDrop = getDatesToDrop($name, $phone);
-    sendDatesToCancel($phone, $getDatesToDrop, $url, $headers);
+    $datesArray = json_decode($getDatesToDrop, true);
+    if (isset($datesArray['status']) && $datesArray['status'] == "error") {
+        $message = $datesArray['message'];
+        confirmation($phone, $message, $headers);
+        return "complete";
+    } else {
+        sendDatesToCancel($phone, $getDatesToDrop, $url, $headers);
+        return "SelectDatesToCancel";
+    }
 }
 
 function handleGetDropStatus($conn, $messageId, $name, $phone, $type, $url, $headers) {

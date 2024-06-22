@@ -7,7 +7,7 @@ function handleFetchAppointments($conn, $messageId, $name, $phone, $url, $header
     $viewAppointments = getAppointments($name, $phone);
     $response = json_decode($viewAppointments, true);
 
-    if (isset($response['booking_data']) && is_array($response['booking_data'])) {
+    if (isset($response['booking_data']) && is_array($response['booking_data']) && count($response['booking_data']) > 0) {
         $spaces = str_repeat(" ", 10);
         $message = "\n" . $spaces . "*Your Appointments*\n";
 
@@ -20,10 +20,12 @@ function handleFetchAppointments($conn, $messageId, $name, $phone, $url, $header
             $message .= "\nTime: " . $time;
             $message .= "\nBooking Date: " . $bookingDate . "\n";
         }
-        appointments($phone, $message, $headers);
     } else {
-        appointments($phone, "No appointments found.", $headers);
+        $message = "No appointments found.";
     }
+    
+    appointments($phone, $message, $headers);
 }
+
 
 ?>

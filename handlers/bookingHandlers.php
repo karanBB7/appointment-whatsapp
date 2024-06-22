@@ -30,6 +30,8 @@ function handleSlotsList($conn, $messageId, $name, $phone, $url, $headers, $date
 
 function handleBooking($conn, $messageId, $name, $phone, $description, $type, $url, $headers, $sessionData,$patientname) {
 
+   
+    $clinicname = $sessionData['clinicname'] ?? '';
     $clinicid = $sessionData['clinicid'] ?? '';
     $dateid = $sessionData['dateid'] ?? '';
     $slotname = str_replace('_slot', '', $description);
@@ -41,6 +43,7 @@ function handleBooking($conn, $messageId, $name, $phone, $description, $type, $u
     $spaces = str_repeat(" ", 10);
     $message =  "\n" . $spaces . "*" . $response['message'] . "*" . "\n";
     $message .= "\n";
+    $message .= "Clinic Name: " . $clinicname . "\n";
     $message .= "Name: " . $patientname . "\n";
     $message .= "Slot: " . $slotname . "\n";
     $message .= "Time: " . $slottime . "\n";

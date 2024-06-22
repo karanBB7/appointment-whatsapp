@@ -3,11 +3,20 @@ require_once("responses/rescheduleResponse.php");
 require_once("middleware/rescheduleMidware.php");
 
 
-function handleGetBookedDate($conn, $messageId, $name, $phone, $url, $headers){
+function handleGetBookedDate($conn, $messageId, $name, $phone, $url, $headers) {
     $bookedDates = getBookedDates($name, $phone);
-    sendBookedData($phone, $url, $headers, $bookedDates);
+    $bookedDatesArray = json_decode($bookedDates, true);
+    if (isset($bookedDatesArray['status']) && $bookedDatesArray['status'] == "error") {
+        $message = $bookedDatesArray['message'];
+        confirmation($phone, $message, $headers);
+        echo "1";
+        return "complete";
+    } else {
+        sendBookedData($phone, $url, $headers, $bookedDates);
+        echo "2";
+        return "bookedDates";
+    }
 }
-
 function handleGetDayReschedule($conn, $messageId, $name, $phone, $type, $url, $headers) {
     $rescheduleDays = getRescheduleDates($name, $phone, $type);
     sendRescheduleDates($phone, $rescheduleDays, $url, $headers);

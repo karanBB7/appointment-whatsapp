@@ -5,6 +5,7 @@ require_once("handlers/bookingHandlers.php");
 require_once("handlers/rescheduleHandlers.php");
 require_once("handlers/cancelHandlers.php");
 require_once("handlers/viewHandlers.php");
+require_once("middleware/viewMidware.php");
 
 $url = 'https://whatsappapi-79t7.onrender.com/interact-messages';
 $headers = array(
@@ -48,6 +49,8 @@ try {
     }
 }
 
+
+
 function processMessage($conn, $row, $url, $headers) {
     $messageId = $row['id'];
     $content = $row['messages'];
@@ -60,6 +63,14 @@ function processMessage($conn, $row, $url, $headers) {
     $currentStep = $session['current_step'];
     $sessionData = json_decode($session['data'], true);
 
+    if ($currentStep === 'complete' && strpos($content, "Hello!") === false) {
+        sendErrorMessage($phone, "Please start the flow again by initializing Hello! doctorname", $headers);
+    }
+
+    if ($currentStep !== 'initial' && $currentStep !== 'complete' && strpos($content, "Hello!") !== false) {
+        sendErrorMessage($phone, "Please start the flow again by initializing Hello! doctorname", $headers);
+    }
+
     if (strpos($content, "Hello!") !== false) {
         $name = trim(substr($content, strpos($content, "Hello!") + strlen("Hello!")));
         $sessionData['name'] = $name;
@@ -68,7 +79,7 @@ function processMessage($conn, $row, $url, $headers) {
         handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers);
     } else if ($currentStep === 'initial') {
         $sessionData['storedType'] = $type;
-        $currentStep = 'cliniclist';
+        $currentStep = 'StartProcess';
         updateSession($conn, $phone, $currentStep, $sessionData);
         handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content);
     } else {
@@ -80,6 +91,8 @@ function processMessage($conn, $row, $url, $headers) {
     $stmt->bind_param("i", $messageId);
     $stmt->execute();
 }
+
+
 
 function getOrCreateSession($conn, $phone) {
     $query = "SELECT * FROM user_sessions WHERE phone = ?";
@@ -116,19 +129,23 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
     $name = $sessionData['name'] ?? '';
     $patientname = $sessionData['patientname'] ?? '';
     $clinicid = $sessionData['clinicid'] ?? null;
+    $clinicname = $sessionData['clinicname'] ?? null;
     $dateid = $sessionData['dateid'] ?? null;
     $storedType = $sessionData['storedType'] ?? null;
 
     if ($storedType === "1") {
         switch ($currentStep) {
-            case "cliniclist":
+            case "StartProcess":
                 handleClinicList($conn, $messageId, $name, $phone, $url, $headers);
                 $nextStep = "datelist";
                 break;
             case "datelist":
                 handleDateList($conn, $messageId, $name, $phone, $type, $url, $headers);
+
                 $clinicid = $type;
                 $sessionData['clinicid'] = $clinicid;
+                $clinicname = $description;
+                $sessionData['clinicname'] = $clinicname;
                 $nextStep = "name";
                 break;
             case "name":
@@ -164,9 +181,8 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
         $bookingDateID = $sessionData['bookingDateID'] ?? null;
         $rescheduleDate = $sessionData['rescheduleDate'] ?? null;
         switch ($currentStep) {
-            case "cliniclist":
-                handleGetBookedDate($conn, $messageId, $name, $phone, $url, $headers);
-                $nextStep = "bookedDates";
+            case "StartProcess":
+                $nextStep = handleGetBookedDate($conn, $messageId, $name, $phone, $url, $headers);
                 break;
             case "bookedDates":
                 $sessionData['bookingDateID'] =  $type;
@@ -192,10 +208,8 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
         }
     } else if ($storedType === "3") {
         switch ($currentStep) {
-
-            case "cliniclist":
-                handleGetDatesToDrop($conn, $messageId, $name, $phone, $url, $headers);
-                $nextStep = "SelectDatesToCancel";
+            case "StartProcess":
+                $nextStep = handleGetDatesToDrop($conn, $messageId, $name, $phone, $url, $headers);
                 break;
 
             case "SelectDatesToCancel":
@@ -208,7 +222,7 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
         }
     } else if ($storedType === "4") {
         switch ($currentStep) {
-            case "cliniclist":
+            case "StartProcess":
                 handleFetchAppointments($conn, $messageId, $name, $phone, $url, $headers);
                 $nextStep = "complete";
                 break;
@@ -217,9 +231,7 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
                 break;
         }
     }
-    
     updateSession($conn, $phone, $nextStep, $sessionData);
 }
-
 
 ?>
