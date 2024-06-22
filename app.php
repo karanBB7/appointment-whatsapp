@@ -60,38 +60,98 @@ function processMessage($conn, $row, $url, $headers) {
     $type = $row['listid'];
 
     $session = getOrCreateSession($conn, $phone);
-    $currentStep = $session['current_step'];
-    $sessionData = json_decode($session['data'], true);
 
-    if ($currentStep === 'complete' && strpos($content, "Hello!") === false) {
-        sendErrorMessage($phone, "Please start the flow again by initializing Hello! doctorname", $headers);
-    }
-
-    if ($currentStep !== 'initial' && $currentStep !== 'complete' && strpos($content, "Hello!") !== false) {
-        sendErrorMessage($phone, "Please start the flow again by initializing Hello! doctorname", $headers);
-    }
-
-    if (strpos($content, "Hello!") !== false) {
-        $name = trim(substr($content, strpos($content, "Hello!") + strlen("Hello!")));
-        $sessionData['name'] = $name;
-        $currentStep = 'initial';
-        updateSession($conn, $phone, $currentStep, $sessionData);
-        handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers);
-    } else if ($currentStep === 'initial') {
-        $sessionData['storedType'] = $type;
-        $currentStep = 'StartProcess';
-        updateSession($conn, $phone, $currentStep, $sessionData);
-        handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content);
+    if ($session === null) {
+        if (strpos($content, "Hello!") !== false) {
+            $name = trim(substr($content, strpos($content, "Hello!") + strlen("Hello!")));
+            $sessionData = ['name' => $name];
+            $currentStep = 'initial';
+            updateSession($conn, $phone, $currentStep, $sessionData);
+            handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers);
+        } else {
+            sendErrorMessage($phone, "Please start the flow again by initializing Hello! doctorname", $headers);
+            
+        }
     } else {
-        handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content);
+        $currentStep = $session['current_step'];
+        $sessionData = json_decode($session['data'], true);
+
+        if ($currentStep === 'complete') {
+            if (strpos($content, "Hello!") !== false) {
+                deleteOldData($conn, $phone);
+                $name = trim(substr($content, strpos($content, "Hello!") + strlen("Hello!")));
+                $sessionData = ['name' => $name];
+                $currentStep = 'initial';
+                updateSession($conn, $phone, $currentStep, $sessionData);
+                handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers);
+            } else {
+                sendErrorMessage($phone, "Please start the flow again by initializing Hello! doctorname", $headers);
+                
+            }
+        } else if (strpos($content, "Hello!") !== false) {
+            deleteOldData($conn, $phone);
+            $name = trim(substr($content, strpos($content, "Hello!") + strlen("Hello!")));
+            $sessionData = ['name' => $name];
+            $currentStep = 'initial';
+            updateSession($conn, $phone, $currentStep, $sessionData);
+            handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers);
+        } else if ($currentStep === 'initial') {
+            $sessionData['storedType'] = $type;
+            $currentStep = 'StartProcess';
+            updateSession($conn, $phone, $currentStep, $sessionData);
+            handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content);
+        } else {
+            handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content);
+        }
     }
 
     $updateQuery = "UPDATE received_whatsapp_messagebot SET status = 1 WHERE id = ?";
     $stmt = $conn->prepare($updateQuery);
     $stmt->bind_param("i", $messageId);
     $stmt->execute();
+
+    $updatedSession = getOrCreateSession($conn, $phone);
+    if ($updatedSession !== null && $updatedSession['current_step'] === 'complete') {
+        moveToUserHistory($conn, $phone);
+        deleteOldData($conn, $phone);
+    }
 }
 
+function deleteOldData($conn, $phone) {
+    $query = "DELETE FROM received_whatsapp_messagebot WHERE fromNumber = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("s", $phone);
+    $stmt->execute();
+
+    $query = "DELETE FROM user_sessions WHERE phone = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("s", $phone);
+    $stmt->execute();
+}
+
+function moveToUserHistory($conn, $phone) {
+    $query = "SELECT * FROM user_sessions WHERE phone = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("s", $phone);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $session = $result->fetch_assoc();
+
+    if ($session) {
+        $decodedData = json_decode($session['data'], true);
+        $cleanData = json_encode($decodedData, JSON_UNESCAPED_SLASHES);
+
+        $historyObject = [
+            'data' => $cleanData,
+            'last_updated' => $session['last_updated']
+        ];
+        $historyJson = json_encode($historyObject, JSON_UNESCAPED_SLASHES);
+        $query = "INSERT INTO user_history (phone, history, createdAt) VALUES (?, ?, NOW())";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("ss", $phone, $historyJson);
+        $stmt->execute();
+    }
+}
 
 
 function getOrCreateSession($conn, $phone) {
@@ -102,23 +162,25 @@ function getOrCreateSession($conn, $phone) {
     $result = $stmt->get_result();
 
     if ($result->num_rows === 0) {
-        $insertQuery = "INSERT INTO user_sessions (phone, current_step, data) VALUES (?, 'initial', '{}')";
-        $insertStmt = $conn->prepare($insertQuery);
-        $insertStmt->bind_param("s", $phone);
-        $insertStmt->execute();
-        return ['current_step' => 'initial', 'data' => '{}'];
+        return null;
     } else {
         return $result->fetch_assoc();
     }
 }
 
 function updateSession($conn, $phone, $currentStep, $data) {
-    $query = "UPDATE user_sessions SET current_step = ?, data = ? WHERE phone = ?";
+    $query = "INSERT INTO user_sessions (phone, current_step, data, last_updated) 
+              VALUES (?, ?, ?, NOW()) 
+              ON DUPLICATE KEY UPDATE 
+              current_step = VALUES(current_step), 
+              data = VALUES(data), 
+              last_updated = NOW()";
     $stmt = $conn->prepare($query);
     $jsonData = json_encode($data);
-    $stmt->bind_param("sss", $currentStep, $jsonData, $phone);
+    $stmt->bind_param("sss", $phone, $currentStep, $jsonData);
     $stmt->execute();
 }
+
 
 function handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers) {
     $response = listMesasage($name, $phone);
@@ -127,11 +189,14 @@ function handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers)
 
 function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content) {
     $name = $sessionData['name'] ?? '';
-    $patientname = $sessionData['patientname'] ?? '';
+    $storedType = $sessionData['storedType'] ?? null;
     $clinicid = $sessionData['clinicid'] ?? null;
     $clinicname = $sessionData['clinicname'] ?? null;
     $dateid = $sessionData['dateid'] ?? null;
-    $storedType = $sessionData['storedType'] ?? null;
+    $slotDetails = $sessionData['slotDetails'] ?? null;
+    $patientname = $sessionData['patientname'] ?? '';
+    
+    $nextStep = $currentStep; 
 
     if ($storedType === "1") {
         switch ($currentStep) {
@@ -141,7 +206,6 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
                 break;
             case "datelist":
                 handleDateList($conn, $messageId, $name, $phone, $type, $url, $headers);
-
                 $clinicid = $type;
                 $sessionData['clinicid'] = $clinicid;
                 $clinicname = $description;
@@ -168,18 +232,17 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
                 $nextStep = "booking";
                 break;
             case "booking":
+                $slotDetails = " {slotName = " .$description. " }"." | "." {slotTime = ".$type." }";
+                $sessionData['slotDetails'] = $slotDetails;
                 $patientname = $sessionData['patientname'];
                 handleBooking($conn, $messageId, $name, $phone, $description, $type, $url, $headers, $sessionData, $patientname);
                 $nextStep = "complete";
                 break;
-            default:
-                $nextStep = $currentStep;
-                break;
         }
     } else if ($storedType === "2") {
-
         $bookingDateID = $sessionData['bookingDateID'] ?? null;
         $rescheduleDate = $sessionData['rescheduleDate'] ?? null;
+        $slotDetails = $sessionData['slotDetails'] ?? null;
         switch ($currentStep) {
             case "StartProcess":
                 $nextStep = handleGetBookedDate($conn, $messageId, $name, $phone, $url, $headers);
@@ -189,21 +252,16 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
                 handleGetDayReschedule($conn, $messageId, $name, $phone, $type, $url, $headers);
                 $nextStep = "dateReschedule";
                 break;
-
             case "dateReschedule":
                 $sessionData['rescheduleDate'] =  $type;
                 handleRescheduleSlots($conn, $messageId, $name, $phone, $bookingDateID, $type, $url, $headers);
                 $nextStep = "slotReschedule";
                 break;
-
             case "slotReschedule":
+                $slotDetails = " {slotName = " .$description. " }"." | "." {slotTime = ".$type." }";
+                $sessionData['slotDetails'] = $slotDetails;
                 handleReschedule($conn, $messageId, $name, $phone, $bookingDateID, $description, $rescheduleDate, $type, $url, $headers);
                 $nextStep = "complete";
-                break;
-
-
-            default:
-                $nextStep = $currentStep;
                 break;
         }
     } else if ($storedType === "3") {
@@ -211,13 +269,9 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
             case "StartProcess":
                 $nextStep = handleGetDatesToDrop($conn, $messageId, $name, $phone, $url, $headers);
                 break;
-
             case "SelectDatesToCancel":
                 handleGetDropStatus($conn, $messageId, $name, $phone, $type, $url, $headers);
                 $nextStep = "complete";
-                break;
-            default:
-                $nextStep = $currentStep;
                 break;
         }
     } else if ($storedType === "4") {
@@ -226,12 +280,11 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
                 handleFetchAppointments($conn, $messageId, $name, $phone, $url, $headers);
                 $nextStep = "complete";
                 break;
-            default:
-                $nextStep = $currentStep;
-                break;
         }
     }
+    
     updateSession($conn, $phone, $nextStep, $sessionData);
+    return $nextStep; 
 }
 
 ?>
