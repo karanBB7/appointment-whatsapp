@@ -1,7 +1,7 @@
 <?php 
 
-require_once("responses/cancelResponse.php");
-require_once("middleware/cancelMidware.php");
+require_once(__DIR__ . "/../responses/cancelResponse.php");
+require_once(__DIR__ . "/../middleware/cancelMidware.php");
 
 function handleGetDatesToDrop($conn, $messageId, $name, $phone, $url, $headers){
     $getDatesToDrop = getDatesToDrop($name, $phone);

@@ -1,6 +1,6 @@
 <?php 
-require_once("responses/rescheduleResponse.php");
-require_once("middleware/rescheduleMidware.php");
+require_once(__DIR__ . "/../responses/rescheduleResponse.php");
+require_once(__DIR__ . "/../middleware/rescheduleMidware.php");
 
 
 function handleGetBookedDate($conn, $messageId, $name, $phone, $url, $headers) {

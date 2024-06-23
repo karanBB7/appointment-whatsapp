@@ -1,6 +1,6 @@
 <?php 
-require_once("responses/viewResponse.php");
-require_once("middleware/viewMidware.php");
+require_once(__DIR__ . "/../responses/viewResponse.php");
+require_once(__DIR__ . "/../middleware/viewMidware.php");
 
 
 function handleFetchAppointments($conn, $messageId, $name, $phone, $url, $headers) {

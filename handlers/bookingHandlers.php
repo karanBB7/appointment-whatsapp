@@ -1,6 +1,6 @@
 <?php 
-require_once("./responses/bookingResponse.php");
-require_once("./middleware/bookingMidware.php");
+require_once(__DIR__ . "/../responses/bookingResponse.php");
+require_once(__DIR__ . "/../middleware/bookingMidware.php");
 
 function handleClinicList($conn, $messageId, $name, $phone, $url, $headers) {
     $getclinic = book($name, $phone);
