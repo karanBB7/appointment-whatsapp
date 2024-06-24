@@ -94,17 +94,25 @@ function sendRescheduleDates($phone, $rescheduleDays, $url, $headers) {
 function sendRescheduleSlots($phone, $rescheduleSlots, $url, $headers){
     $response = json_decode($rescheduleSlots, true);
     $sections = array();
+    
+    function formatSlotTitle($title) {
+        return ucfirst(str_replace('_slot', '', $title));
+    }
+    
     foreach ($response['slots'] as $slot_title => $times) {
         $rows = array();
+        $formatted_title = formatSlotTitle($slot_title);
+        
         foreach ($times as $time_id => $time_title) {
             $rows[] = array(
                 'id' => $time_id,
                 'title' => $time_title,
-                'description' => $slot_title, 
+                'description' => $formatted_title,
             );
         }
+        
         $sections[] = array(
-            'title' => $slot_title,
+            'title' => $formatted_title,
             'rows' => $rows,
         );
     }

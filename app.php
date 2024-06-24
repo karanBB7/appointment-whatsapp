@@ -96,6 +96,7 @@ function processMessage($conn, $row, $url, $headers) {
             handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers);
         } else {
             sendErrorMessage($phone, "Please start the flow again by initializing Hello! doctorname", $headers);
+            
         }
     } else {
         $currentStep = $session['current_step'];
@@ -111,6 +112,7 @@ function processMessage($conn, $row, $url, $headers) {
                 handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers);
             } else {
                 sendErrorMessage($phone, "Please start the flow again by initializing Hello! doctorname", $headers);
+                
             }
         } else if (strpos($content, "Hello!") !== false) {
             deleteOldData($conn, $phone);
@@ -177,6 +179,7 @@ function moveToUserHistory($conn, $phone) {
     }
 }
 
+
 function getOrCreateSession($conn, $phone) {
     $query = "SELECT * FROM user_sessions WHERE phone = ?";
     $stmt = $conn->prepare($query);
@@ -204,10 +207,19 @@ function updateSession($conn, $phone, $currentStep, $data) {
     $stmt->execute();
 }
 
+
 function handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers) {
-    $response = listMesasage($name, $phone);
-    Listappointment($phone, $response, $url, $headers);
+    $response = checkUser($name, $phone);
+    $responseData = json_decode($response, true);
+    if (!empty($responseData['booking_data'])) {
+        $response = listMesasage($name, $phone);
+        Listappointment($phone, $response, $url, $headers);
+    } else {
+        bookAppointmentList($phone,$url,$headers);
+    }    
 }
+exit;
+
 
 function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content) {
     $name = $sessionData['name'] ?? '';
@@ -215,7 +227,8 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
     $clinicid = $sessionData['clinicid'] ?? null;
     $clinicname = $sessionData['clinicname'] ?? null;
     $dateid = $sessionData['dateid'] ?? null;
-    $slotDetails = $sessionData['slotDetails'] ?? null;
+    $slotName = $sessionData['slotName'] ?? null;
+    $slotTime = $sessionData['slotTime'] ?? null;
     $patientname = $sessionData['patientname'] ?? '';
     
     $nextStep = $currentStep; 
@@ -223,44 +236,49 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
     if ($storedType === "1") {
         switch ($currentStep) {
             case "StartProcess":
-                handleClinicList($conn, $messageId, $name, $phone, $url, $headers);
-                $nextStep = "datelist";
-                break;
-            case "datelist":
                 handleDateList($conn, $messageId, $name, $phone, $type, $url, $headers);
+                $nextStep = "cliniclist";
+                break;
+
+            case "cliniclist":
+                $dateid = $type;
+                $sessionData['dateid'] = $dateid;
+                handleClinicList($conn, $messageId, $name, $phone,$dateid , $url, $headers);
+                $nextStep = "slotslist";
+                break;
+
+            case "slotslist":
                 $clinicid = $type;
                 $sessionData['clinicid'] = $clinicid;
                 $clinicname = $description;
                 $sessionData['clinicname'] = $clinicname;
+                handleSlotsList($conn, $messageId, $name, $phone, $dateid, $clinicid, $url, $headers);
                 $nextStep = "name";
                 break;
+
             case "name":
-                $dateid = $type;
-                $sessionData['dateid'] = $dateid;
+                $slotName = $description;
+                $sessionData['slotName'] = $slotName;
+                $slotTime = $type;
+                $sessionData['slotTime'] = $slotTime;
                 if (empty($content)) {
                     handleNamePrompt($conn, $messageId, $phone, $headers);
-                    $nextStep = "slotslist"; 
+                    $nextStep = "booking"; 
                 } else {
                     $sessionData['name'] = $name;
                     handleNameInput($conn, $messageId, $phone, $content, $headers);
-                    $nextStep = "slotslist";
+                    $nextStep = "booking";
                 }
                 break;
-            case "slotslist":
-                $sessionData['patientname'] = $content;
-                $clinicid = $sessionData['clinicid'] ?? null;
-                $dateid = $sessionData['dateid'] ?? null;
-                handleSlotsList($conn, $messageId, $name, $phone, $url, $headers, $dateid, $clinicid);
-                $nextStep = "booking";
-                break;
+
             case "booking":
-                $slotDetails = " {slotName = " .$description. " }"." | "." {slotTime = ".$type." }";
-                $sessionData['slotDetails'] = $slotDetails;
-                $patientname = $sessionData['patientname'];
-                handleBooking($conn, $messageId, $name, $phone, $description, $type, $url, $headers, $sessionData, $patientname);
+                $patientname = $content;
+                $sessionData['patientname'] = $patientname;
+                handleBooking($conn, $messageId, $name, $phone, $url, $headers, $sessionData);
                 $nextStep = "complete";
                 break;
         }
+
     } else if ($storedType === "2") {
         $bookingDateID = $sessionData['bookingDateID'] ?? null;
         $rescheduleDate = $sessionData['rescheduleDate'] ?? null;
@@ -307,8 +325,6 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
     
     updateSession($conn, $phone, $nextStep, $sessionData);
     return $nextStep; 
-
-    
 }
-echo "all good";
+
 ?>
