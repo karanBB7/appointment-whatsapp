@@ -15,13 +15,12 @@ function logError($message) {
     error_log($message, 3, '/var/www/html/appointment/log/appointment_daemon.err.log');
 }
 
-
-
 $url = 'https://whatsappapi-79t7.onrender.com/interact-messages';
 $headers = array(
-    'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJPd25lck5hbWUiOiJCaXp0ZWNobm9zeXMtbWlkd2FyZSIsInBob25lTnVtYmVySWQiOiIyNDg4OTg2NDQ5NzI0MDQiLCJ3aGF0c2FwcE1ldGFUb2tlbiI6IkVBQXhWMWc0dDI0UUJPd2ZBOGw1Q3d6Tm1qNUlvaHlWUkdaQWNKemRpTW9xb3hMWDZ1a3h3cVEzSDlGZVRHZUVuVmxaQkRhMXc0dUYxUzczUUk0OVkwTEpPQ1hJU0tTd2dBZkJnZ1N6dzNyUWlWSmtLRWt0Q0lMaTlqdzNRbUhXMmxnWFpBaXlwdXdaQ3FhSmRRaXBsb0M1SEtyYUx0ODZiSnVtSEt3RUFXNGthMGRaQlRPNWl4dWV1R1Ztb0daQ2JLbkZBUEEwVzkwWkNVR2dSZ29oIiwiaWF0IjoxNzA5MjAwMTEwfQ.ZMy9wpBxphJbpEOYI3bBchlywwKCIN23GJiYrDlvXyc',
+    'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJPd25lck5hbWUiOiJBYWR5YS1saW5xbWQiLCJwaG9uZU51bWJlcklkIjoiMzQ5MDI4MjY0OTYxMjM2Iiwid2hhdHNhcHBNZXRhVG9rZW4iOiJFQUFMdlNXakVKUjBCT1pCWkJESlpBUnM2WkJ3d2wwY2E4bWZLd3J5WFdiN1N4dVZQeE5iNkVESGk3ZW5aQm9BRWNEelJGUkdpVXFSRHdSS3NLSlRGTElZUnY1YlpDdjdBZjNiZkNzcDRkZWlBTVpBN3F1UmxaQ1VFNUJqSGVzNnBaQlBnT1lTeFdMbXhKbUhBTTFrS3lyVWFCVXVkMkJsUkxsNkJtSWdqeEV3V1VOaEg2bGhmbE9FVlpCTlY4UThuYXRVV3hmNmRVcklDdVpBYWxPMW1ORVdOcWtaRCIsImlhdCI6MTcxOTQwNTcyNH0.MRwBEbsR1B0S8jNcvBqWFDSyIDftUjVaGxnSqeGhtk8',
     'Content-Type: application/json',
 );
+
 
 $host = getenv('DB_HOST') ?: "13.232.224.97";
 $user = getenv('DB_USER') ?: "drupaladmin";
@@ -34,6 +33,7 @@ ignore_user_abort(true);
 $running = true;
 $lastDbCheck = 0;
 $dbCheckInterval = 5; 
+
 while ($running) {
     $now = time();
     if ($now - $lastDbCheck >= $dbCheckInterval) {
@@ -46,7 +46,7 @@ while ($running) {
 
             $query = "SELECT id, messages, fromNumber, buttonText, description, status, listid 
                       FROM received_whatsapp_messagebot 
-                      WHERE status IN (0, 2)";
+                      WHERE status IN (0, 2, 3)";
             $result = mysqli_query($conn, $query);
 
             if (!$result) {
@@ -55,9 +55,7 @@ while ($running) {
 
             $messagesToProcess = [];
             while ($row = mysqli_fetch_assoc($result)) {
-                if ($row['status'] == 0 || $row['status'] == "2") {
-                    $messagesToProcess[] = $row;
-                }
+                $messagesToProcess[] = $row;
             }
 
             foreach ($messagesToProcess as $row) {
@@ -218,7 +216,6 @@ function handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers)
         bookAppointmentList($phone,$url,$headers);
     }    
 }
-exit;
 
 
 function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content) {

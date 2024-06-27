@@ -51,15 +51,34 @@ function sendBookedData($phone, $url, $headers, $bookedDates) {
 
 function sendRescheduleDates($phone, $rescheduleDays, $url, $headers) {
     $responseArray = json_decode($rescheduleDays, true);
+
     if (isset($responseArray['date'])) {
         $listMessage = $responseArray['date'];
         $rows = array();
-        foreach ($listMessage as $id => $date) {
+        $today = new DateTime();
+        $tomorrow = new DateTime('tomorrow');
+        $dayAfterTomorrow = new DateTime('tomorrow +1 day');
+        $todayFormatted = $today->format('d/m/Y l');
+        $tomorrowFormatted = $tomorrow->format('d/m/Y l');
+        $dayAfterTomorrowFormatted = $dayAfterTomorrow->format('d/m/Y l');
+        
+        foreach ($listMessage as $id => $day) {
+            if ($day == "Today") {
+                $description = $todayFormatted;
+            } elseif ($day == "Tomorrow") {
+                $description = $tomorrowFormatted;
+            } elseif ($day == "day after") {
+                $description = $dayAfterTomorrowFormatted;
+            } else {
+                $description = '';
+            }
             $rows[] = array(
                 'id' => $id,
-                'title' => $date,
+                'title' => $day,
+                'description' => $description
             );
         }
+
 
         $data = array(
             'to' => $phone,

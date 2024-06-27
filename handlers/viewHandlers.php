@@ -3,23 +3,40 @@ require_once(__DIR__ . "/../responses/viewResponse.php");
 require_once(__DIR__ . "/../middleware/viewMidware.php");
 
 
+
 function handleFetchAppointments($conn, $messageId, $name, $phone, $url, $headers) {
     $viewAppointments = getAppointments($name, $phone);
+    // echo $viewAppointments;exit;
     $response = json_decode($viewAppointments, true);
 
     if (isset($response['booking_data']) && is_array($response['booking_data']) && count($response['booking_data']) > 0) {
-        $spaces = str_repeat(" ", 10);
-        $message = "\n" . $spaces . "*Your Appointments*\n";
+        $patientName = ucfirst($response['booking_data'][0]['patient_name'] ?? $name);
+        $message = "*Dear $patientName*, Your appointment details:\n\n";
 
-        foreach ($response['booking_data'] as $appointment) {
+        if (count($response['booking_data']) > 1) {
+            foreach ($response['booking_data'] as $index => $appointment) {
+                $clinicName = $appointment['clinic_name'] ?? 'N/A';
+                $time = $appointment['Time'] ?? 'N/A';
+                $bookingDate = isset($appointment['booking_date']) ? date('l, F j, Y', strtotime($appointment['booking_date'])) : 'N/A';
+                $doctorName = $appointment['username'] ?? 'your doctor'; 
+                $appointmentNumber = $index + 1;
+                $message .= "*Appointment $appointmentNumber:*\n";
+                $message .= "Your appointment with *$doctorName* at *$clinicName* on *$bookingDate* at *$time* is accepted. ";
+                // $message .= "Someone from the clinic will call and confirm the appointment shortly.\n\n";
+                $message .= "\n\n";
+            }
+        } else {
+            $appointment = $response['booking_data'][0];
             $clinicName = $appointment['clinic_name'] ?? 'N/A';
             $time = $appointment['Time'] ?? 'N/A';
-            $bookingDate = $appointment['booking_date'] ?? 'N/A';
-
-            $message .= "\nClinic Name: " . $clinicName;
-            $message .= "\nTime: " . $time;
-            $message .= "\nBooking Date: " . $bookingDate . "\n";
+            $bookingDate = isset($appointment['booking_date']) ? date('l, F j, Y', strtotime($appointment['booking_date'])) : 'N/A';
+            $doctorName = $appointment['username'] ?? 'your doctor'; 
+            $message .= "Your appointment with *$doctorName* at *$clinicName* on *$bookingDate* at *$time* is accepted. ";
+            // $message .= "Someone from the clinic will call and confirm the appointment shortly.\n\n";
+            $message .= "\n\n";
         }
+        $message .= "Thank you for choosing our services. We look forward to seeing you.";
+
     } else {
         $message = "No appointments found.";
     }
