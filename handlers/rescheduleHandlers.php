@@ -9,11 +9,9 @@ function handleGetBookedDate($conn, $messageId, $name, $phone, $url, $headers) {
     if (isset($bookedDatesArray['status']) && $bookedDatesArray['status'] == "error") {
         $message = $bookedDatesArray['message'];
         confirmation($phone, $message, $headers);
-        echo "1";
         return "complete";
     } else {
         sendBookedData($phone, $url, $headers, $bookedDates);
-        echo "2";
         return "bookedDates";
     }
 }
@@ -29,9 +27,8 @@ function handleRescheduleSlots($conn, $messageId, $name, $phone, $bookingDateID,
 }
 
 function handleReschedule($conn, $messageId, $name, $phone, $bookingDateID, $description, $rescheduleDate, $type, $url, $headers){
-    $slotname = str_replace('_slot', '', $description);
+    $slotname = strtolower($description);
     $slottime = $type;
-
     $rescheduleStatus = getRescheduleStatus($name, $phone, $bookingDateID, $rescheduleDate, $slotname, $slottime);
     $response = json_decode($rescheduleStatus, true);
     if($response['status'] == "success"){

@@ -51,15 +51,34 @@ function sendBookedData($phone, $url, $headers, $bookedDates) {
 
 function sendRescheduleDates($phone, $rescheduleDays, $url, $headers) {
     $responseArray = json_decode($rescheduleDays, true);
+
     if (isset($responseArray['date'])) {
         $listMessage = $responseArray['date'];
         $rows = array();
-        foreach ($listMessage as $id => $date) {
+        $today = new DateTime();
+        $tomorrow = new DateTime('tomorrow');
+        $dayAfterTomorrow = new DateTime('tomorrow +1 day');
+        $todayFormatted = $today->format('d/m/Y l');
+        $tomorrowFormatted = $tomorrow->format('d/m/Y l');
+        $dayAfterTomorrowFormatted = $dayAfterTomorrow->format('d/m/Y l');
+        
+        foreach ($listMessage as $id => $day) {
+            if ($day == "Today") {
+                $description = $todayFormatted;
+            } elseif ($day == "Tomorrow") {
+                $description = $tomorrowFormatted;
+            } elseif ($day == "day after") {
+                $description = $dayAfterTomorrowFormatted;
+            } else {
+                $description = '';
+            }
             $rows[] = array(
                 'id' => $id,
-                'title' => $date,
+                'title' => $day,
+                'description' => $description
             );
         }
+
 
         $data = array(
             'to' => $phone,
@@ -94,17 +113,25 @@ function sendRescheduleDates($phone, $rescheduleDays, $url, $headers) {
 function sendRescheduleSlots($phone, $rescheduleSlots, $url, $headers){
     $response = json_decode($rescheduleSlots, true);
     $sections = array();
+    
+    function formatSlotTitle($title) {
+        return ucfirst(str_replace('_slot', '', $title));
+    }
+    
     foreach ($response['slots'] as $slot_title => $times) {
         $rows = array();
+        $formatted_title = formatSlotTitle($slot_title);
+        
         foreach ($times as $time_id => $time_title) {
             $rows[] = array(
                 'id' => $time_id,
                 'title' => $time_title,
-                'description' => $slot_title, 
+                'description' => $formatted_title,
             );
         }
+        
         $sections[] = array(
-            'title' => $slot_title,
+            'title' => $formatted_title,
             'rows' => $rows,
         );
     }

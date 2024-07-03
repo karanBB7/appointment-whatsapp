@@ -47,6 +47,39 @@ function Listappointment($phone, $response, $url, $headers) {
     }
 }
 
+
+function bookAppointmentList($phone, $url, $headers) {
+    $data = array(
+        'to' => $phone,
+        'interactive' => array(
+            'type' => 'list',
+            'header' => array(
+                'type' => 'text',
+                'text' => 'How can I help you?',
+            ),
+            'body' => array(
+                'text' => 'Please select the respective activity given below:',
+            ),
+            'action' => array(
+                'button' => 'Select Options',
+                'sections' => array(
+                    array(
+                        'title' => 'Select The following',
+                        'rows' => array(
+                            array(
+                                'id' => "1",
+                                'title' => "Book Appointment",
+                            )
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    );
+    return sendWhatsAppMessage($url, $data, $headers);
+}
+
+
 function clincList($phone, $getclinic, $url, $headers) {
     $responseArray = json_decode($getclinic, true);
     if (isset($responseArray['clinic'])) {
@@ -68,13 +101,13 @@ function clincList($phone, $getclinic, $url, $headers) {
                 'type' => 'list',
                 'header' => array(
                     'type' => 'text',
-                    'text' => 'Choose the clinic which you would like to visit?',
+                    'text' => 'Which clinic do you want to visit the doctor?',
                 ),
                 'body' => array(
-                    'text' => 'Please select the respective activity given:',
+                    'text' => 'Please select the clinic',
                 ),
                 'action' => array(
-                    'button' => 'Select Options',
+                    'button' => 'Clinic',
                     'sections' => array(
                         array(
                             'title' => 'Select the following:',
@@ -91,17 +124,36 @@ function clincList($phone, $getclinic, $url, $headers) {
     }
 }
 
-function sendDate($phone, $getdate, $url, $headers) {
+function sendDate($name, $phone, $getdate, $url, $headers) {
     $responseArray = json_decode($getdate, true);
+
     if (isset($responseArray['date'])) {
         $listMessage = $responseArray['date'];
         $rows = array();
-        foreach ($listMessage as $id => $date) {
+        $today = new DateTime();
+        $tomorrow = new DateTime('tomorrow');
+        $dayAfterTomorrow = new DateTime('tomorrow +1 day');
+        $todayFormatted = $today->format('d/m/Y l');
+        $tomorrowFormatted = $tomorrow->format('d/m/Y l');
+        $dayAfterTomorrowFormatted = $dayAfterTomorrow->format('d/m/Y l');
+        
+        foreach ($listMessage as $id => $day) {
+            if ($day == "Today") {
+                $description = $todayFormatted;
+            } elseif ($day == "Tomorrow") {
+                $description = $tomorrowFormatted;
+            } elseif ($day == "day after") {
+                $description = $dayAfterTomorrowFormatted;
+            } else {
+                $description = '';
+            }
             $rows[] = array(
                 'id' => $id,
-                'title' => $date,
+                'title' => $day,
+                'description' => $description
             );
         }
+
 
         $data = array(
             'to' => $phone,
@@ -109,10 +161,10 @@ function sendDate($phone, $getdate, $url, $headers) {
                 'type' => 'list',
                 'header' => array(
                     'type' => 'text',
-                    'text' => 'When would you like to visit?',
+                    'text' => 'When would you like to visit? '. $name,
                 ),
                 'body' => array(
-                    'text' => 'Please select the respective activity given:',
+                    'text' => 'Please choose the date',
                 ),
                 'action' => array(
                     'button' => 'Select Options',
@@ -132,23 +184,68 @@ function sendDate($phone, $getdate, $url, $headers) {
     }
 }
 
-function sendslots($phone, $slots, $url, $headers) {
+
+function sendTimeSlotName($phone, $url, $headers) {
+    $data = array(
+        'to' => $phone,
+        'interactive' => array(
+            'type' => 'list',
+            'header' => array(
+                'type' => 'text',
+                'text' => 'Choose your convenient time slot',
+            ),
+            'body' => array(
+                'text' => 'Please select the respective activity given below:',
+            ),
+            'action' => array(
+                'button' => 'Slots',
+                'sections' => array(
+                    array(
+                        'title' => 'Select The following',
+                        'rows' => array(
+                            array(
+                                'id' => "1",
+                                'title' => "Morning",
+                            ),
+                            array(
+                                'id' => "2",
+                                'title' => "Afternoon",
+                            ),
+                            array(
+                                'id' => "3",
+                                'title' => "Evening",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    );
+    return sendWhatsAppMessage($url, $data, $headers);
+}
+
+
+
+
+function sendslots($phone, $slots, $slotName, $url, $headers) {
     $response = json_decode($slots, true);
-    $sections = array();
-    foreach ($response['slots'] as $slot_title => $times) {
-        $rows = array();
-        foreach ($times as $time_id => $time_title) {
-            $rows[] = array(
-                'id' => $time_id,
-                'title' => $time_title,
-                'description' => $slot_title, 
-            );
-        }
-        $sections[] = array(
-            'title' => $slot_title,
-            'rows' => $rows,
+    $slotKey = strtolower($slotName) . '_slot';
+    $rows = array();
+    foreach ($response[$slotKey] as $time_id => $time_title) {
+        $rows[] = array(
+            'id' => $time_id,
+            'title' => $time_title,
+            'description' => $slotName . ' slot',
         );
+        if (count($rows) >= 10) break; // Limit to 10 items
     }
+    
+    $sections = array(
+        array(
+            'title' => $slotName,
+            'rows' => $rows,
+        )
+    );
 
     $data = array(
         'to' => $phone,
@@ -157,13 +254,14 @@ function sendslots($phone, $slots, $url, $headers) {
             'type' => 'list',
             'header' => array(
                 'type' => 'text',
-                'text' => 'Choose your preferred Time Slots',
+                'text' => 'Choose a Time Slot',
             ),
             'body' => array(
-                'text' => 'Please select the respective activity in given',
+                'text' => "Select from available " . strtolower($slotName) . " time slots." . 
+                          (count($rows) == 10 ? "\nShowing first 10 slots." : ""),
             ),
             'action' => array(
-                'button' => 'Select Options',
+                'button' => 'View Slots',
                 'sections' => $sections,
             ),
         ),
@@ -207,6 +305,7 @@ function sendWhatsAppMessage($url, $data, $headers) {
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     $result = curl_exec($ch);
+    // echo $result;exit;
     if (curl_errno($ch)) {
         error_log('Curl error: ' . curl_error($ch));
     }
