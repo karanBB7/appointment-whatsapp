@@ -35,6 +35,18 @@ function makeApiRequest($payload) {
     }
 }
 
+
+
+
+function  getExistence($phone){
+    $payload = [
+        "mobilenumber" => $phone,
+    ];
+    return makeApiRequest($payload);
+}
+
+
+
 function checkUser($username, $phonenumber) {
     $payload = [
         "username" => $username,

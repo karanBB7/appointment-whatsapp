@@ -110,31 +110,26 @@ function sendRescheduleDates($phone, $rescheduleDays, $url, $headers) {
 }
 
 
-function sendRescheduleSlots($phone, $rescheduleSlots, $url, $headers){
-    $response = json_decode($rescheduleSlots, true);
-    $sections = array();
-    
-    function formatSlotTitle($title) {
-        return ucfirst(str_replace('_slot', '', $title));
-    }
-    
-    foreach ($response['slots'] as $slot_title => $times) {
-        $rows = array();
-        $formatted_title = formatSlotTitle($slot_title);
-        
-        foreach ($times as $time_id => $time_title) {
-            $rows[] = array(
-                'id' => $time_id,
-                'title' => $time_title,
-                'description' => $formatted_title,
-            );
-        }
-        
-        $sections[] = array(
-            'title' => $formatted_title,
-            'rows' => $rows,
+
+function sendslotsReschedule($phone, $slots, $slotName, $url, $headers) {
+    $response = json_decode($slots, true);
+    $slotKey = strtolower($slotName) . '_slot';
+    $rows = array();
+    foreach ($response[$slotKey] as $time_id => $time_title) {
+        $rows[] = array(
+            'id' => $time_id,
+            'title' => $time_title,
+            'description' => $slotName . ' slot',
         );
+        if (count($rows) >= 10) break; 
     }
+    
+    $sections = array(
+        array(
+            'title' => $slotName,
+            'rows' => $rows,
+        )
+    );
 
     $data = array(
         'to' => $phone,
@@ -143,18 +138,59 @@ function sendRescheduleSlots($phone, $rescheduleSlots, $url, $headers){
             'type' => 'list',
             'header' => array(
                 'type' => 'text',
-                'text' => 'Choose your preferred Time Slots',
+                'text' => 'Choose a Time Slot',
             ),
             'body' => array(
-                'text' => 'Please select the respective activity in given',
+                'text' => "Select from available " . strtolower($slotName) . " time slots." . 
+                          (count($rows) == 10 ? "\nShowing first 10 slots." : ""),
             ),
             'action' => array(
-                'button' => 'Select Options',
+                'button' => 'View Slots',
                 'sections' => $sections,
             ),
         ),
     );
 
+    return sendWhatsAppMessage($url, $data, $headers);
+}
+
+
+function sendRescheduleTimeSlotName($phone, $url, $headers) {
+    $data = array(
+        'to' => $phone,
+        'interactive' => array(
+            'type' => 'list',
+            'header' => array(
+                'type' => 'text',
+                'text' => 'Choose your convenient time slot',
+            ),
+            'body' => array(
+                'text' => 'Please select the respective activity given below:',
+            ),
+            'action' => array(
+                'button' => 'Slots',
+                'sections' => array(
+                    array(
+                        'title' => 'Select The following',
+                        'rows' => array(
+                            array(
+                                'id' => "1",
+                                'title' => "Morning",
+                            ),
+                            array(
+                                'id' => "2",
+                                'title' => "Afternoon",
+                            ),
+                            array(
+                                'id' => "3",
+                                'title' => "Evening",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    );
     return sendWhatsAppMessage($url, $data, $headers);
 }
 

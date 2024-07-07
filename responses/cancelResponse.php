@@ -4,7 +4,7 @@ function makeApiRequestCancel($payload) {
     $curl = curl_init();
     
     $defaultOptions = [
-        CURLOPT_URL => 'http://13.234.213.35/linqmd/webhook-appointment',
+        CURLOPT_URL => 'http://13.234.213.35/webhook-appointment',
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_ENCODING => '',
         CURLOPT_MAXREDIRS => 10,

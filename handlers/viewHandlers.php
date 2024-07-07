@@ -17,11 +17,10 @@ function handleFetchAppointments($conn, $messageId, $name, $phone, $url, $header
                 $clinicName = $appointment['clinic_name'] ?? 'N/A';
                 $time = $appointment['Time'] ?? 'N/A';
                 $bookingDate = isset($appointment['booking_date']) ? date('l, F j, Y', strtotime($appointment['booking_date'])) : 'N/A';
-                $doctorName = $appointment['username'] ?? 'your doctor'; 
+                $doctorName = $appointment['fullname'] ?? 'your doctor'; 
                 $appointmentNumber = $index + 1;
                 $message .= "*Appointment $appointmentNumber:*\n";
                 $message .= "Your appointment with *$doctorName* at *$clinicName* on *$bookingDate* at *$time* is accepted. ";
-                // $message .= "Someone from the clinic will call and confirm the appointment shortly.\n\n";
                 $message .= "\n\n";
             }
         } else {
@@ -29,9 +28,8 @@ function handleFetchAppointments($conn, $messageId, $name, $phone, $url, $header
             $clinicName = $appointment['clinic_name'] ?? 'N/A';
             $time = $appointment['Time'] ?? 'N/A';
             $bookingDate = isset($appointment['booking_date']) ? date('l, F j, Y', strtotime($appointment['booking_date'])) : 'N/A';
-            $doctorName = $appointment['username'] ?? 'your doctor'; 
+            $doctorName = $appointment['fullname'] ?? 'your doctor'; 
             $message .= "Your appointment with *$doctorName* at *$clinicName* on *$bookingDate* at *$time* is accepted. ";
-            // $message .= "Someone from the clinic will call and confirm the appointment shortly.\n\n";
             $message .= "\n\n";
         }
         $message .= "Thank you for choosing our services. We look forward to seeing you.";

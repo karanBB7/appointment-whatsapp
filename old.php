@@ -1,5 +1,7 @@
 <?php
 
+
+
 declare(ticks=1);
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -11,6 +13,7 @@ require_once("handlers/cancelHandlers.php");
 require_once("handlers/viewHandlers.php");
 require_once("middleware/viewMidware.php");
 
+
 function logError($message) {
     error_log($message, 3, '/var/www/html/appointment/log/appointment_daemon.err.log');
 }
@@ -21,68 +24,16 @@ $headers = array(
     'Content-Type: application/json',
 );
 
+function checkUsernumber($phone, $url, $headers){
+    handleCheckNumber($phone, $url, $headers);
+}
+checkUsernumber("919964642973", $url, $headers);
 
-// $host = getenv('DB_HOST') ?: "13.232.224.97";
-// $user = getenv('DB_USER') ?: "drupaladmin";
-// $pass = getenv('DB_PASS') ?: "Linqmd*123";
-// $db = getenv('DB_NAME') ?: "appointment";
 
-// set_time_limit(0);
-// ignore_user_abort(true);
 
-// $running = true;
-// $lastDbCheck = 0;
-// $dbCheckInterval = 5; 
-
-// while ($running) {
-//     $now = time();
-//     if ($now - $lastDbCheck >= $dbCheckInterval) {
-//         try {
-//             $conn = mysqli_connect($host, $user, $pass, $db);
-
-//             if (!$conn) {
-//                 throw new Exception("Database connection failed: " . mysqli_connect_error());
-//             }
-
-//             mysqli_autocommit($conn, FALSE);
-
-//             $query = "SELECT id, messages, fromNumber, buttonText, description, status, listid 
-//                       FROM received_whatsapp_messagebot 
-//                       WHERE status IN (0, 2, 3) AND processing = 0";
-//             $result = mysqli_query($conn, $query);
-
-//             if (!$result) {
-//                 throw new Exception('Error in SQL query: ' . mysqli_error($conn));
-//             }
-
-//             $messagesToProcess = [];
-//             while ($row = mysqli_fetch_assoc($result)) {
-//                 $messagesToProcess[] = $row;
-//             }
-
-//             foreach ($messagesToProcess as $row) {
-//                 processMessage($conn, $row, $url, $headers);
-//             }
-
-//             mysqli_close($conn);
-//         } catch (Exception $e) {
-//             logError("Error: " . $e->getMessage());
-//             if (isset($conn) && mysqli_connect_errno() === 0) {
-//                 mysqli_rollback($conn);
-//                 mysqli_close($conn);
-//             }
-//         }
-//         $lastDbCheck = $now;
-//     }
-    
-//     usleep(100000); 
-//     pcntl_signal_dispatch();
-// }
-
-// logError("Script shutting down");
 
 $conn = mysqli_connect("localhost", "root", "", "appointment");
-$query = "SELECT id, messages, fromNumber, buttonText, description, status, listid 
+$query = "SELECT id, messages, fromNumber, buttonText,title, description, status, listid 
 FROM received_whatsapp_messagebot 
 WHERE status IN (0, 2, 3) AND processing = 0";
 $result = mysqli_query($conn, $query);
@@ -103,83 +54,91 @@ foreach ($messagesToProcess as $row) {
 
 function processMessage($conn, $row, $url, $headers) {
     $messageId = $row['id'];
-    
-    mysqli_begin_transaction($conn);
-    
-    $lockQuery = "UPDATE received_whatsapp_messagebot SET processing = 1 WHERE id = ? AND processing = 0";
-    $lockStmt = $conn->prepare($lockQuery);
-    $lockStmt->bind_param("i", $messageId);
-    $lockStmt->execute();
-    
-    if ($lockStmt->affected_rows === 0) {
-        mysqli_rollback($conn);
-        return;
-    }
-    
-    $content = $row['messages'];
     $phone = $row['fromNumber'];
-    $description = $row['description'];
-    $status = $row['status'];
+    $content = $row['messages'];
     $type = $row['listid'];
+    $status = $row['status'];
+    $description = $row['description'];
+    $title = $row['title'];
 
-    $session = getOrCreateSession($conn, $phone);
+    mysqli_begin_transaction($conn);
 
-    if ($session === null) {
-        if (strpos($content, "Hello!") !== false) {
-            $name = trim(substr($content, strpos($content, "Hello!") + strlen("Hello!")));
-            $sessionData = ['name' => $name];
-            $currentStep = 'initial';
-            updateSession($conn, $phone, $currentStep, $sessionData);
-            handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers);
-        } else {
-            sendErrorMessage($phone, "Please start the flow again by initializing Hello! doctorname", $headers);
+    try {
+        $lockQuery = "UPDATE received_whatsapp_messagebot SET processing = 1 WHERE id = ? AND processing = 0";
+        $lockStmt = $conn->prepare($lockQuery);
+        $lockStmt->bind_param("i", $messageId);
+        $lockStmt->execute();
+        
+        if ($lockStmt->affected_rows === 0) {
+            throw new Exception("Message already being processed");
         }
-    } else {
-        $currentStep = $session['current_step'];
-        $sessionData = json_decode($session['data'], true);
 
-        if ($currentStep === 'complete') {
-            if (strpos($content, "Hello!") !== false) {
-                deleteOldData($conn, $phone);
-                $name = trim(substr($content, strpos($content, "Hello!") + strlen("Hello!")));
-                $sessionData = ['name' => $name];
-                $currentStep = 'initial';
-                updateSession($conn, $phone, $currentStep, $sessionData);
-                handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers);
-            } else {
-                sendErrorMessage($phone, "Please start the flow again by initializing Hello! doctorname", $headers);
+        $session = getOrCreateSession($conn, $phone);
+        $currentStep = $session ? $session['current_step'] : 'no record';
+        $sessionData = $session ? json_decode($session['data'], true) : [];
+
+        echo "Initial state - Phone: $phone, CurrentStep: $currentStep, Content: $content\n";
+
+        if (!empty($content) && ($currentStep === 'no record' || $currentStep === 'complete')) {
+            $responseData = handleCheckNumber($phone, $url, $headers);
+            
+            if (!is_array($responseData)) {
+                throw new Exception("Invalid response from handleCheckNumber");
             }
-        } else if (strpos($content, "Hello!") !== false) {
-            deleteOldData($conn, $phone);
-            $name = trim(substr($content, strpos($content, "Hello!") + strlen("Hello!")));
-            $sessionData = ['name' => $name];
-            $currentStep = 'initial';
-            updateSession($conn, $phone, $currentStep, $sessionData);
-            handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers);
-        } else if ($currentStep === 'initial') {
-            $sessionData['storedType'] = $type;
-            $currentStep = 'StartProcess';
-            updateSession($conn, $phone, $currentStep, $sessionData);
-            handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content);
-        } else {
-            handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content);
+
+            if (isset($responseData['success']) && $responseData['success'] === "true") {
+                $name = $responseData['Username'];
+                $sessionData['name'] = $name;
+                $currentStep = 'initial';
+                
+                updateSession($conn, $phone, $currentStep, $sessionData);
+                echo "Updated session to 'initial' - Phone: $phone, Name: $name\n";
+            } else {
+                throw new Exception("Unable to find user information");
+            }
+        } elseif (empty($content) && in_array($type, ['1', '2', '3', '4'])) {
+            if ($session) {
+                $sessionData['storedType'] = $type;
+                $currentStep = 'StartProcess';
+                updateSession($conn, $phone, $currentStep, $sessionData);
+                echo "Updated session to 'StartProcess' - Phone: $phone, StoredType: $type\n";
+            } else {
+                throw new Exception("No session found for phone: $phone");
+            }
         }
+
+        echo "Handling section - Phone: $phone, CurrentStep: $currentStep, Type: $type\n";
+
+        $newStep = handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $title, $url, $headers, $content);
+
+        if ($newStep !== $currentStep) {
+            updateSession($conn, $phone, $newStep, $sessionData);
+            echo "Updated session to new step - Phone: $phone, NewStep: $newStep\n";
+        }
+
+        $session = getOrCreateSession($conn, $phone);
+        $updatedStep = $session['current_step'];
+        echo "Updated step - Phone: $phone, UpdatedStep: $updatedStep, Expected new step: $newStep\n";
+
+        if ($newStep !== $updatedStep) {
+            throw new Exception("Step mismatch: Expected $newStep, but got $updatedStep");
+        }
+
+        $updateQuery = "UPDATE received_whatsapp_messagebot SET status = 1, processing = 0 WHERE id = ?";
+        $stmt = $conn->prepare($updateQuery);
+        $stmt->bind_param("i", $messageId);
+        $stmt->execute();
+
+        mysqli_commit($conn);
+    } catch (Exception $e) {
+        mysqli_rollback($conn);
+        echo "Exception: " . $e->getMessage() . "\n";
     }
-
-    $updateQuery = "UPDATE received_whatsapp_messagebot SET status = 1, processing = 0 WHERE id = ?";
-    $stmt = $conn->prepare($updateQuery);
-    $stmt->bind_param("i", $messageId);
-    $stmt->execute();
-
-    $updatedSession = getOrCreateSession($conn, $phone);
-    if ($updatedSession !== null && $updatedSession['current_step'] === 'complete') {
-        moveToUserHistory($conn, $phone);
-        deleteOldData($conn, $phone);
-    }
-
-    // Commit the transaction
-    mysqli_commit($conn);
 }
+
+
+
+
 
 function deleteOldData($conn, $phone) {
     $query = "DELETE FROM received_whatsapp_messagebot WHERE fromNumber = ?";
@@ -192,6 +151,10 @@ function deleteOldData($conn, $phone) {
     $stmt->bind_param("s", $phone);
     $stmt->execute();
 }
+
+
+
+
 
 function moveToUserHistory($conn, $phone) {
     $query = "SELECT * FROM user_sessions WHERE phone = ?";
@@ -255,12 +218,13 @@ function handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers)
     }    
 }
 
-function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $url, $headers, $content) {
+function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $title, $url, $headers, $content) {
     $name = $sessionData['name'] ?? '';
     $storedType = $sessionData['storedType'] ?? null;
     $clinicid = $sessionData['clinicid'] ?? null;
     $clinicname = $sessionData['clinicname'] ?? null;
     $dateid = $sessionData['dateid'] ?? null;
+    $dateName = $sessionData['dateName'] ?? null;
     $slotName = $sessionData['slotName'] ?? null;
     $slotTime = $sessionData['slotTime'] ?? null;
     $patientname = $sessionData['patientname'] ?? '';
@@ -277,22 +241,30 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
             case "cliniclist":
                 $dateid = $type;
                 $sessionData['dateid'] = $dateid;
+                $dateName = $title;
+                $sessionData['dateName'] = $dateName;
                 handleClinicList($conn, $messageId, $name, $phone,$dateid , $url, $headers);
-                $nextStep = "slotslist";
+                $nextStep = "timeSlots";
                 break;
 
-            case "slotslist":
+
+            case "timeSlots":
                 $clinicid = $type;
                 $sessionData['clinicid'] = $clinicid;
                 $clinicname = $description;
                 $sessionData['clinicname'] = $clinicname;
-                handleSlotsList($conn, $messageId, $name, $phone, $dateid, $clinicid, $url, $headers);
-                $nextStep = "name";
+                handleTimeSlot($phone, $url, $headers);
+                $nextStep = "slotslist";
+                break;
+
+            
+            case "slotslist":
+                $slotName = $title;
+                $sessionData['slotName'] = $slotName;
+                $nextStep = handleSlotsList($conn, $messageId, $name, $phone, $dateid, $clinicid, $slotName, $dateName, $url, $headers);
                 break;
 
             case "name":
-                $slotName = $description;
-                $sessionData['slotName'] = $slotName;
                 $slotTime = $type;
                 $sessionData['slotTime'] = $slotTime;
                 if (empty($content)) {
@@ -316,7 +288,7 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
     } else if ($storedType === "2") {
         $bookingDateID = $sessionData['bookingDateID'] ?? null;
         $rescheduleDate = $sessionData['rescheduleDate'] ?? null;
-        $slotDetails = $sessionData['slotDetails'] ?? null;
+        $slotName = $sessionData['slotName'] ?? null;
         switch ($currentStep) {
             case "StartProcess":
                 $nextStep = handleGetBookedDate($conn, $messageId, $name, $phone, $url, $headers);
@@ -324,20 +296,30 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
             case "bookedDates":
                 $sessionData['bookingDateID'] =  $type;
                 handleGetDayReschedule($conn, $messageId, $name, $phone, $type, $url, $headers);
+                $nextStep = "timeSlotsReschedule";
+                break;
+
+            case "timeSlotsReschedule":
+                $sessionData['rescheduleDate'] =  $type;
+                handleTimeSlotReschedule($phone, $url, $headers);
                 $nextStep = "dateReschedule";
                 break;
+
+
             case "dateReschedule":
-                $sessionData['rescheduleDate'] =  $type;
-                handleRescheduleSlots($conn, $messageId, $name, $phone, $bookingDateID, $type, $url, $headers);
-                $nextStep = "slotReschedule";
+                $slotName = $title;
+                $sessionData['slotName'] = $slotName;
+                $nextStep = handleRescheduleSlots($conn, $messageId, $name, $phone, $bookingDateID, $rescheduleDate, $slotName, $url, $headers);
                 break;
+
             case "slotReschedule":
-                $slotDetails = " {slotName = " .$description. " }"." | "." {slotTime = ".$type." }";
-                $sessionData['slotDetails'] = $slotDetails;
-                handleReschedule($conn, $messageId, $name, $phone, $bookingDateID, $description, $rescheduleDate, $type, $url, $headers);
+                $slotTime = $type;
+                handleReschedule($conn, $messageId, $name, $phone, $bookingDateID, $rescheduleDate, $slotName, $slotTime, $url, $headers);
                 $nextStep = "complete";
                 break;
         }
+
+        
     } else if ($storedType === "3") {
         switch ($currentStep) {
             case "StartProcess":
@@ -347,7 +329,7 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
                 handleGetDropStatus($conn, $messageId, $name, $phone, $type, $url, $headers);
                 $nextStep = "complete";
                 break;
-        }
+            }
     } else if ($storedType === "4") {
         switch ($currentStep) {
             case "StartProcess":

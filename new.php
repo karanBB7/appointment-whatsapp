@@ -1,5 +1,7 @@
 <?php
 
+
+
 declare(ticks=1);
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -11,6 +13,7 @@ require_once("handlers/cancelHandlers.php");
 require_once("handlers/viewHandlers.php");
 require_once("middleware/viewMidware.php");
 
+
 function logError($message) {
     // error_log($message, 3, '/var/www/html/appointment/log/appointment_daemon.err.log');
 }
@@ -21,6 +24,13 @@ $headers = array(
     'Content-Type: application/json',
 );
 
+// function checkUsernumber($phone, $url, $headers){
+//     handleCheckNumber($phone, $url, $headers);
+// }
+// checkUsernumber("919964642973", $url, $headers);
+
+
+
 
 $conn = mysqli_connect("localhost", "root", "", "appointment");
 $query = "SELECT id, messages, fromNumber, buttonText,title, description, status, listid 
@@ -29,8 +39,9 @@ WHERE status IN (0, 2, 3) AND processing = 0";
 $result = mysqli_query($conn, $query);
 
 if (!$result) {
-    throw new Exception('Error in SQL query: ' . mysqli_error($conn));
+throw new Exception('Error in SQL query: ' . mysqli_error($conn));
 }
+
 
 $messagesToProcess = [];
 while ($row = mysqli_fetch_assoc($result)) {
@@ -66,6 +77,8 @@ function processMessage($conn, $row, $url, $headers) {
         $currentStep = $session ? $session['current_step'] : 'no record';
         $sessionData = $session ? json_decode($session['data'], true) : [];
 
+        // echo "Initial state - Phone: $phone, CurrentStep: $currentStep, Content: $content\n";
+
         if (!empty($content) && ($currentStep === 'no record' || $currentStep === 'complete')) {
             $responseData = handleCheckNumber($phone, $url, $headers);
             
@@ -79,6 +92,7 @@ function processMessage($conn, $row, $url, $headers) {
                 $currentStep = 'initial';
                 
                 updateSession($conn, $phone, $currentStep, $sessionData);
+                // echo "Updated session to 'initial' - Phone: $phone, Name: $name\n";
             } else {
                 throw new Exception("Unable to find user information");
             }
@@ -88,16 +102,21 @@ function processMessage($conn, $row, $url, $headers) {
             $sessionData['storedType'] = $type;
             $currentStep = 'StartProcess';
             updateSession($conn, $phone, $currentStep, $sessionData);
+            // echo "Updated session to 'StartProcess' - Phone: $phone, StoredType: $type\n";
         }
+
+        // echo "Handling section - Phone: $phone, CurrentStep: $currentStep, Type: $type\n";
 
         $newStep = handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $title, $url, $headers, $content);
 
         if ($newStep !== $currentStep) {
             updateSession($conn, $phone, $newStep, $sessionData);
+            // echo "Updated session to new step - Phone: $phone, NewStep: $newStep\n";
         }
 
         $session = getOrCreateSession($conn, $phone);
         $updatedStep = $session['current_step'];
+        // echo "Updated step - Phone: $phone, UpdatedStep: $updatedStep, Expected new step: $newStep\n";
 
         if ($newStep !== $updatedStep) {
             throw new Exception("Step mismatch: Expected $newStep, but got $updatedStep");
@@ -108,32 +127,30 @@ function processMessage($conn, $row, $url, $headers) {
         $stmt->bind_param("i", $messageId);
         $stmt->execute();
 
-        // Check if the process is complete
-        if ($newStep === 'complete') {
-            moveToUserHistory($conn, $phone);
-            deleteOldData($conn, $phone);
-        }
-
         mysqli_commit($conn);
     } catch (Exception $e) {
         mysqli_rollback($conn);
-        echo "Exception: " . $e->getMessage() . "\n";
+        // echo "Exception: " . $e->getMessage() . "\n";
     }
 }
 
+
+
 function deleteOldData($conn, $phone) {
-    // Delete from received_whatsapp_messagebot
     $query = "DELETE FROM received_whatsapp_messagebot WHERE fromNumber = ?";
     $stmt = $conn->prepare($query);
     $stmt->bind_param("s", $phone);
     $stmt->execute();
 
-    // Delete from user_sessions
     $query = "DELETE FROM user_sessions WHERE phone = ?";
     $stmt = $conn->prepare($query);
     $stmt->bind_param("s", $phone);
     $stmt->execute();
 }
+
+
+
+
 
 function moveToUserHistory($conn, $phone) {
     $query = "SELECT * FROM user_sessions WHERE phone = ?";
@@ -190,6 +207,8 @@ function updateSession($conn, $phone, $currentStep, $data) {
     }
 }
 
+
+
 function handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers) {
     $response = checkUser($name, $phone);
     $responseData = json_decode($response, true);
@@ -201,7 +220,7 @@ function handleInitialResponse($conn, $messageId, $name, $phone, $url, $headers)
     }    
 }
 
-function handleSection($conn, $currentStep, $messageId, &$sessionData, $phone, $status, $type, $description, $title, $url, $headers, $content) {
+function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $status, $type, $description, $title, $url, $headers, $content) {
     $name = $sessionData['name'] ?? '';
     $storedType = $sessionData['storedType'] ?? null;
     $clinicid = $sessionData['clinicid'] ?? null;
@@ -229,8 +248,8 @@ function handleSection($conn, $currentStep, $messageId, &$sessionData, $phone, $
                 $sessionData['dateName'] = $dateName;
                 handleClinicList($conn, $messageId, $name, $phone,$dateid , $url, $headers);
                 $nextStep = "timeSlots";
-                echo "Session data after cliniclist: " . json_encode($sessionData) . "\n";
                 break;
+
 
             case "timeSlots":
                 $clinicid = $type;
@@ -240,6 +259,7 @@ function handleSection($conn, $currentStep, $messageId, &$sessionData, $phone, $
                 handleTimeSlot($phone, $url, $headers);
                 $nextStep = "slotslist";
                 break;
+
             
             case "slotslist":
                 $slotName = $title;
@@ -269,11 +289,11 @@ function handleSection($conn, $currentStep, $messageId, &$sessionData, $phone, $
 
             default:
                 throw new Exception("Unknown step: $currentStep");
-        }
+            }
+
     } else if ($storedType === "2") {
         $bookingDateID = $sessionData['bookingDateID'] ?? null;
         $rescheduleDate = $sessionData['rescheduleDate'] ?? null;
-        $rescheduleDateName = $sessionData['rescheduleDateName'] ?? null;
         $slotName = $sessionData['slotName'] ?? null;
         switch ($currentStep) {
             case "StartProcess":
@@ -284,23 +304,28 @@ function handleSection($conn, $currentStep, $messageId, &$sessionData, $phone, $
                 handleGetDayReschedule($conn, $messageId, $name, $phone, $type, $url, $headers);
                 $nextStep = "timeSlotsReschedule";
                 break;
+
             case "timeSlotsReschedule":
                 $sessionData['rescheduleDate'] =  $type;
-                $sessionData['rescheduleDateName'] =  $title;
                 handleTimeSlotReschedule($phone, $url, $headers);
                 $nextStep = "dateReschedule";
                 break;
+
+
             case "dateReschedule":
                 $slotName = $title;
                 $sessionData['slotName'] = $slotName;
-                $nextStep = handleRescheduleSlots($conn, $messageId, $name, $phone, $bookingDateID, $rescheduleDate,$rescheduleDateName, $slotName, $url, $headers);
+                $nextStep = handleRescheduleSlots($conn, $messageId, $name, $phone, $bookingDateID, $rescheduleDate, $slotName, $url, $headers);
                 break;
+
             case "slotReschedule":
                 $slotTime = $type;
                 handleReschedule($conn, $messageId, $name, $phone, $bookingDateID, $rescheduleDate, $slotName, $slotTime, $url, $headers);
                 $nextStep = "complete";
                 break;
         }
+
+        
     } else if ($storedType === "3") {
         switch ($currentStep) {
             case "StartProcess":
@@ -310,7 +335,7 @@ function handleSection($conn, $currentStep, $messageId, &$sessionData, $phone, $
                 handleGetDropStatus($conn, $messageId, $name, $phone, $type, $url, $headers);
                 $nextStep = "complete";
                 break;
-        }
+            }
     } else if ($storedType === "4") {
         switch ($currentStep) {
             case "StartProcess":
@@ -320,8 +345,13 @@ function handleSection($conn, $currentStep, $messageId, &$sessionData, $phone, $
         }
     }
     
+    updateSession($conn, $phone, $nextStep, $sessionData);
     return $nextStep; 
 }
+
+
+// pcntl_signal(SIGTERM, "signalHandler");
+// pcntl_signal(SIGINT, "signalHandler");
 
 function signalHandler($signo) {
     global $running;

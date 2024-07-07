@@ -282,6 +282,18 @@ function confirmation($phone, $message, $headers) {
     return sendWhatsAppMessage($url, $data, $headers);
 }
 
+function sendMessage($phone, $message, $headers) {
+    $url = "https://whatsappapi-79t7.onrender.com/send-text-message";
+    $data = array(
+        "messaging_product" => "whatsapp",
+        "to" => $phone,
+        "text" => array(
+            "body" => $message
+        )
+    );
+    return sendWhatsAppMessage($url, $data, $headers);
+}
+
 function name($phone, $message, $headers) {
     $url = "https://whatsappapi-79t7.onrender.com/send-text-message";
     $data = array(
