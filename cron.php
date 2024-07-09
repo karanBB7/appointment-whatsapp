@@ -362,8 +362,8 @@ function handleSection($conn, $currentStep, $messageId, $sessionData, $phone, $s
 }
 
 
-// pcntl_signal(SIGTERM, "signalHandler");
-// pcntl_signal(SIGINT, "signalHandler");
+pcntl_signal(SIGTERM, "signalHandler");
+pcntl_signal(SIGINT, "signalHandler");
 
 function signalHandler($signo) {
     global $running;

@@ -6,46 +6,6 @@ require_once("./middleware/bookingMidware.php");
 
 
 
-
-
-function handleCheckNumber($phone, $url, $headers) {
-    $res = getExistence($phone);
-    echo $res;exit;
-    $response = json_decode($res, true);
-
-    if ($response['success'] == 'true') {
-        $docfullname = $response['Docfullname'];
-        $date = $response['date'];
-        $slotTime = $response['slotTime'];
-
-        if ($response['appointment_existence'] == 'yes') {
-            if ($response['appointment_tense'] == 'future') {
-                $message = "You have a confirmed appointment with *$docfullname* on *$date* at *$slotTime*.";
-                $name = $response['Username']; 
-                $listResponse = listMesasage($name, $phone);
-                sendMessage($phone, $message, $headers);
-                Listappointment($phone, $listResponse, $url, $headers);
-            } else {
-                $message = "You previously visited *$docfullname* on *$date* at *$slotTime*.";
-                sendMessage($phone, $message, $headers);
-                bookAppointmentList($phone,$url,$headers);
-            }
-        } else {
-            $message = "Cannot locate your appointment details, please contact the clinic.";
-            sendMessage($phone, $message, $headers);
-        }
-    } else {
-        $message = "Cannot locate your details, please contact the clinic.";
-        sendMessage($phone, $message, $headers);
-    }
-
-    return $response;
-}
-
-
-
-
-
 function handleDateList($conn, $messageId, $name, $phone, $type, $url, $headers) {
     $getdate = getday($name, $phone, $type);
     sendDate($name, $phone, $getdate, $url, $headers);

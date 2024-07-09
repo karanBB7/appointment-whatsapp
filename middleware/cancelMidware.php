@@ -8,14 +8,14 @@ function sendDatesToCancel($phone, $getDatesToDrop, $url, $headers) {
         $rows = array();
 
         foreach ($listMessage as $id => $item) {
-            $parts = explode(' ', $item);
-            $date = $parts[0];
-            $time = $parts[1] . ' ' . $parts[2];
+            $dateTime = new DateTime($item);
+            $formattedDate = $dateTime->format('l jS F');
+            $formattedTime = $dateTime->format('g:i A');
             
             $rows[] = array(
                 'id' => $id,
-                'title' => $date, 
-                'description' => $time 
+                'title' => $formattedDate, 
+                'description' => $formattedTime 
             );
         }
 

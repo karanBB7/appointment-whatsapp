@@ -1,51 +1,89 @@
 <?php
 
 function Listappointment($phone, $response, $url, $headers) {
-    $responseArray = json_decode($response, true);
-    if (isset($responseArray['list_message'])) {
-        $listMessage = $responseArray['list_message'];
-        $rows = array();
-        foreach ($listMessage as $id => $title) {
-            $rows[] = array(
-                'id' => $id,
-                'title' => $title,
-                'description' => '' 
-            );
-        }
-        $rows[] = array(
-            'id' => '5',
-            'title' => 'Other Services',
-            'description' => ''
-        );
-
-        $data = array(
-            'to' => $phone,
-            'interactive' => array(
-                'type' => 'list',
-                'header' => array(
-                    'type' => 'text',
-                    'text' => 'How can I help you?',
-                ),
-                'body' => array(
-                    'text' => 'Please select the respective activity in given',
-                ),
-                'action' => array(
-                    'button' => 'Select Options',
-                    'sections' => array(
-                        array(
-                            'title' => 'Select The following',
-                            'rows' => $rows,
+$data = array(
+        'to' => $phone,
+        'interactive' => array(
+            'type' => 'list',
+            'header' => array(
+                'type' => 'text',
+                'text' => 'How can I help you?',
+            ),
+            'body' => array(
+                'text' => 'Do you want to?',
+            ),
+            'action' => array(
+                'button' => 'Select Options',
+                'sections' => array(
+                    array(
+                        'title' => 'Select The following',
+                        'rows' => array(
+                            array(
+                                'id' => "4",
+                                'title' => "Show Appointment Details",
+                            ),
+                            array(
+                                'id' => "3",
+                                'title' => "Cancel Appointment",
+                            ),
+                            
                         ),
                     ),
                 ),
             ),
-        );
-
-        return sendWhatsAppMessage($url, $data, $headers);
-    } else {
-        return "Invalid response format";
-    }
+        ),
+    );
+    return sendWhatsAppMessage($url, $data, $headers);
 }
+
+
+
+// function Listappointment($phone, $response, $url, $headers) {
+//     $responseArray = json_decode($response, true);
+//     if (isset($responseArray['list_message'])) {
+//         $listMessage = $responseArray['list_message'];
+//         $rows = array();
+//         foreach ($listMessage as $id => $title) {
+//             $rows[] = array(
+//                 'id' => $id,
+//                 'title' => $title,
+//                 'description' => '' 
+//             );
+//         }
+//         $rows[] = array(
+//             'id' => '5',
+//             'title' => 'Other Services',
+//             'description' => ''
+//         );
+
+//         $data = array(
+//             'to' => $phone,
+//             'interactive' => array(
+//                 'type' => 'list',
+//                 'header' => array(
+//                     'type' => 'text',
+//                     'text' => 'How can I help you?',
+//                 ),
+//                 'body' => array(
+//                     'text' => 'Please select the respective activity in given',
+//                 ),
+//                 'action' => array(
+//                     'button' => 'Select Options',
+//                     'sections' => array(
+//                         array(
+//                             'title' => 'Select The following',
+//                             'rows' => $rows,
+//                         ),
+//                     ),
+//                 ),
+//             ),
+//         );
+
+//         return sendWhatsAppMessage($url, $data, $headers);
+//     } else {
+//         return "Invalid response format";
+//     }
+// }
 
 
 function bookAppointmentList($phone, $url, $headers) {
